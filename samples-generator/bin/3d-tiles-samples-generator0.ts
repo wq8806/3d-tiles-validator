@@ -131,7 +131,7 @@ const args: GeneratorArgs = {
 
 var promises = [
     // Batched
-    /*createBatchedWithBatchTable(),
+    createBatchedWithBatchTable(),
     createBatchedWithoutBatchTable(),
     createBatchedWithBatchTableBinary(),
     createBatchedTranslucent(),
@@ -152,11 +152,52 @@ var promises = [
     createBatchedExpiration(),
     createBatchedWithVertexColors(),
     createBatchedWithContentDataUri(),
-    createBatchedAnimated(),*/
-
+    createBatchedAnimated(),
+    // Point Cloud
+    createPointCloudRGB(),
+    createPointCloudRGBA(),
+    createPointCloudRGB565(),
+    createPointCloudConstantColor(),
+    createPointCloudNoColor(),
+    createPointCloudWGS84(),
+    createPointCloudQuantized(),
+    createPointCloudNormals(),
+    createPointCloudNormalsOctEncoded(),
+    createPointCloudQuantizedOctEncoded(),
+    createPointCloudBatched(),
+    createPointCloudWithPerPointProperties(),
+    createPointCloudWithUnicodePropertyNames(),
+    createPointCloudWithTransform(),
+    createPointCloudDraco(),
+    createPointCloudDracoPartial(),
+    createPointCloudDracoBatched(),
+    createPointCloudTimeDynamic(),
+    createPointCloudTimeDynamicWithTransforms(),
+    createPointCloudTimeDynamicDraco(),
+    // Instanced
+    createInstancedWithBatchTable(),
+    createInstancedWithoutBatchTable(),
+    createInstancedWithBatchTableBinary(),
+    createInstancedGltfExternal(),
+    createInstancedOrientation(),
+    createInstancedOct32POrientation(),
+    createInstancedQuantizedOct32POrientation(),
+    createInstancedQuantized(),
+    createInstancedScaleNonUniform(),
+    createInstancedScale(),
+    createInstancedRTC(),
+    createInstancedWithTransform(),
+    createInstancedRedMaterial(),
+    createInstancedWithBatchIds(),
+    createInstancedTextured(),
+    createInstancedAnimated(),
+    // Composite
+    createComposite(),
+    createCompositeOfComposite(),
+    createCompositeOfInstanced(),
     // Hierarchy
     createHierarchy(),
-    /*createHierarchyLegacy(),
+    createHierarchyLegacy(),
     createHierarchyMultipleParents(),
     createHierarchyNoParents(),
     createHierarchyBinary(),
@@ -179,7 +220,7 @@ var promises = [
     createDiscreteLOD(),
     createTreeBillboards(),
     createRequestVolume(),
-    createExpireTileset()*/
+    createExpireTileset()
 ];
 
 async function main() {
