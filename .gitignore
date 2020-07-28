@@ -20,3 +20,6 @@ dist/
 
 # Generated documentation
 doc/
+
+# generator
+samples-generator/.idea
