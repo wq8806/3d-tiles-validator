@@ -65,8 +65,6 @@ export function createBatchTableHierarchy(options) {
     var multipleParents = defaultValue(options.multipleParents, false);
     var transform = defaultValue(options.transform, Matrix4.IDENTITY);
 
-    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
-
     var instances = createInstances(noParents, multipleParents);
     var batchTableJson = createBatchTableJson(instances, options);
 
