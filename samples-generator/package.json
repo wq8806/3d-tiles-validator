@@ -32,10 +32,11 @@
     "fast-xml-parser": "^3.17.4",
     "fs-extra": "^9.0.1",
     "gltf-pipeline": "^2.1.10",
+    "iterator-result": "^1.0.0",
     "math-ds": "^1.2.1",
     "mime": "^2.4.6",
     "simplex-noise": "^2.4.0",
-    "sparse-octree": "^6.0.2"
+    "sparse-octree": "^5.2.1"
   },
   "devDependencies": {
     "@types/fs-extra": "^9.0.1",
