@@ -97,23 +97,13 @@ export function createBatchTableHierarchy(options) {
         console.log(buildingbounds);
 
         readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
-            // console.log(xmlMap.get('3YRUDfcyHErvr_vn5cgjsR--IfcMember.gltf'));
-            /*for(let [key, value] of gltfMap){
+            //es6 strict 模式下无效
+            /*for(var [key, value] of gltfMap){
                 gltfMap.set(key,xmlMap.get(key));
             }*/
-            try {
-                /*for(const [key, value] of  Object.entries(gltfMap)){
-                    gltfMap.set(key,xmlMap.get(key));
-                }*/
-                gltfMap.forEach(function(value,key){
-                    gltfMap.set(key,xmlMap.get(key));
-                });
-            }catch (e) {
-                console.error(e);
-            }
-            /*for (let key of gltfMap.keys()) {
+            gltfMap.forEach(function(value,key){
                 gltfMap.set(key,xmlMap.get(key));
-            }*/
+            });
             //console.log(gltfMap);
             var contentUri = 'tile.b3dm';
             var directory = options.directory;
@@ -121,7 +111,7 @@ export function createBatchTableHierarchy(options) {
             var tilesetJsonPath = path.join(directory, 'tileset.json');
             var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";
             rootbounds = JSON.parse(rootboundsStr);
-            console.log(rootbounds);
+
             var box = [
                 rootbounds.center.z , rootbounds.center.x , rootbounds.center.y,
                 rootbounds.dimensions.z / 2, 0 , 0,
