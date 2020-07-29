@@ -11,8 +11,9 @@ import {
     defined,
     Math as CesiumMath,
     Matrix4,
-    Quaternion
+    Quaternion,
 } from 'cesium';
+var Cesium = require('cesium');
 
 const gltfPipeline = require('gltf-pipeline');
 var gltfToGlb = gltfPipeline.gltfToGlb;
@@ -32,6 +33,11 @@ var createGlb = require('./createGlb');
 var getBufferPadded = require('./getBufferPadded');
 var saveBinary = require('./saveBinary');
 var saveJson = require('./saveJson');
+// add own dependency
+var readXml = require('./readXml');
+var readGltfNames = require('./readGltfNames');
+var math_ds = require('math-ds');
+var PointOctree = require('sparse-octree');
 
 var sizeOfFloat = 4;
 var sizeOfUint16 = 2;
@@ -67,205 +73,797 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var instances = createInstances(noParents, multipleParents);
+    var directoryPath = "../data/bim/sample_all/";
+    options.gltfDirectory = directoryPath;
+    readXml({directoryPath:directoryPath}).then(function (xmlMap) {
+        debugger
+        console.log(xmlMap);
+        var rootbounds;
+        for (let k of xmlMap.keys()) {
+            if(k.indexOf('IfcProject') >= 0){
+                rootbounds = xmlMap.get(k);
+                break;
+            }
+        }
+        var buildingbounds;
+        for (let k of xmlMap.keys()) {
+            if(k.indexOf('IfcBuilding') >= 0){
+                buildingbounds = xmlMap.get(k);
+                break;
+            }
+        }
+        var buildingboundsStr = "{\"center\":{\"x\":23.912799999999997,\"y\":5.6331,\"z\":-11.093300000000001},\"dimensions\":{\"x\":83.9766,\"y\":13.704600000000001,\"z\":84.7206},\"minXYZ\":[-18.075500000000005,-1.2192000000000007,-53.4536],\"maxXYZ\":[65.9011,12.4854,31.267000000000003]}";
+        buildingbounds = JSON.parse(buildingboundsStr);
+        console.log(buildingbounds);
+
+        readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
+            // console.log(xmlMap.get('3YRUDfcyHErvr_vn5cgjsR--IfcMember.gltf'));
+            /*for(let [key, value] of gltfMap){
+                gltfMap.set(key,xmlMap.get(key));
+            }*/
+            try {
+                /*for(const [key, value] of  Object.entries(gltfMap)){
+                    gltfMap.set(key,xmlMap.get(key));
+                }*/
+                gltfMap.forEach(function(value,key){
+                    gltfMap.set(key,xmlMap.get(key));
+                });
+            }catch (e) {
+                console.error(e);
+            }
+            /*for (let key of gltfMap.keys()) {
+                gltfMap.set(key,xmlMap.get(key));
+            }*/
+            //console.log(gltfMap);
+            var contentUri = 'tile.b3dm';
+            var directory = options.directory;
+            // var tilePath = path.join(directory, contentUri);
+            var tilesetJsonPath = path.join(directory, 'tileset.json');
+            var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";
+            rootbounds = JSON.parse(rootboundsStr);
+            console.log(rootbounds);
+            var box = [
+                rootbounds.center.z , rootbounds.center.x , rootbounds.center.y,
+                rootbounds.dimensions.z / 2, 0 , 0,
+                0 , rootbounds.dimensions.x / 2,0,
+                0 , 0 , rootbounds.dimensions.y / 2
+            ];
+            var geometricError = computeSSE(rootbounds);
+
+            var opts:any = {
+                // contentUri : contentUri,
+                geometricError : geometricError,
+                box : box,
+                transform : transform
+            };
+            var tilesetJson = createTilesetJsonSingle(opts);
+            delete tilesetJson.root['content'];
+            if (!options.legacy) {
+                Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
+                Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
+            }
+
+            try {
+                /*var box1 = new math_ds.Box3(
+                    new math_ds.Vector3( rootbounds.center.z - rootbounds.dimensions.z / 2,
+                        rootbounds.center.x - rootbounds.dimensions.x / 2, rootbounds.center.y - rootbounds.dimensions.y / 2),
+                    new math_ds.Vector3( rootbounds.center.z + rootbounds.dimensions.z / 2,
+                        rootbounds.center.x + rootbounds.dimensions.x / 2, rootbounds.center.y + rootbounds.dimensions.y / 2),
+                );
+                console.log(box1);*/
+                var rootbox = new math_ds.Box3(
+                    new math_ds.Vector3(rootbounds.minXYZ[2],rootbounds.minXYZ[0],rootbounds.minXYZ[1]),
+                    new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
+                );
+                //console.log(box);
+                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 200);
+                gltfMap.forEach(function(value,key){
+                    octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
+                });
+                /*for(var [key, value] of gltfMap){
+                    octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
+                }*/
+                /*var countExist = 0;
+                var countLose = 0;
+
+                for(var [key,value] of gltfMap){
+                    var point = new math_ds.Vector3(value.center.z, value.center.x, value.center.y);
+                    if(!octree.root.contains(point, octree.bias)){
+                        console.log(key);
+                        console.log(point);
+                        ++countLose;
+                    }else {
+                        ++countExist;
+                    }
+                }
+                console.log(countExist);
+                console.log(countLose);*/
+                console.log(octree.pointCount);
+                console.log(octree.getDepth());
+                if(octree.getDepth() > 0){
+                    octree.root.tile = null;
+                }
+                const iterator = octree.leaves();
+
+                let i = 0;
+                // var children = [];
+                while(!iterator.next().done) {
+                    console.log(iterator.indices);
+                    var indicesArr = iterator.indices;
+                    var currentOctant = iterator.result.value;
+                    // currentOctant.tile = null;
+                    if(currentOctant.children === null){
+                        if(currentOctant.data !== null){
+                            // children.push(computeTile(currentOctant.data));
+                            currentOctant.tile = computeTile(currentOctant.data,indicesArr);
+                            currentOctant.tile.geometricError = 0;
+                        }
+                    }else {
+                        //octree.leaves()返回子节点迭代器，因而不会执行到非子节点来,此else不会执行
+                        if(currentOctant.data !== null){
+                            currentOctant.tile.children.push(computeTile(currentOctant.data,indicesArr));
+                            currentOctant.tile = computeTile(currentOctant.data,indicesArr);
+                        }else {
+                            //有子节点的卦限point一定为null
+                            // currentOctant.tile = computeTile(currentOctant.data,indicesArr);
+                        }
+                    }
+                    ++i;
+                }
+                console.log(i);
+                console.log(JSON.stringify(octree));
+                try {
+                    var depth = octree.getDepth();
+                    var ocs = octree.findOctantsByLevel(0);  //1
+                    var ocs1 = octree.findOctantsByLevel(1);
+                    var ocsss = octree.findOctantsByLevel(depth-1);  //40
+                    var ocss = octree.findOctantsByLevel(depth);   //64
+                    var ocs3 = octree.findOctantsByLevel(depth+1);   //0
+                    for (let j = 1; j < depth; j++) {
+                        var octants = octree.findOctantsByLevel(j);
+                        for (let k = 0; k < octants.length; k++) {
+                            var currentOctant = octants[k];
+                            var minAndmaxobj = modifyOctantWithChildren_MinMax(currentOctant,undefined);
+                            if(currentOctant.children !== null){   //包含子节点的修改
+                                currentOctant.min.x = Math.min.apply(null, minAndmaxobj.minX);
+                                currentOctant.min.y = Math.min.apply(null, minAndmaxobj.minY);
+                                currentOctant.min.z = Math.min.apply(null, minAndmaxobj.minZ);
+                                currentOctant.max.x = Math.max.apply(null, minAndmaxobj.maxX);
+                                currentOctant.max.y = Math.max.apply(null, minAndmaxobj.maxY);
+                                currentOctant.max.z = Math.max.apply(null, minAndmaxobj.maxZ);
+                            }
+                        }
+                    }
+                    // console.log(JSON.stringify(octree.root.children));
+                    octree.root.children.forEach(function (value,index,arr) {
+                        // modifyOctantMinAndMax(value);
+                    })
+                    var testss = getRootJSONFromOctree(octree.root);
+                    deleteNull(testss);
+
+                    console.log(JSON.stringify(testss));
+                    var children = JSON.parse(JSON.stringify(testss.children));
+                    tilesetJson.root.children = children;
+                    console.log(JSON.stringify(tilesetJson));
+                }catch (e) {
+                    console.error(e);
+                }
+
+            }catch (e) {
+                console.error(e);
+            }
+
+            //createB3dmTile11(options);
+            try {
+                var promiseArr = createB3DMTask(options,tilesetJson.root.children,undefined);
+                saveJson(tilesetJsonPath, tilesetJson, options.prettyJson);
+                return Promise.all(promiseArr).then(function (results) {
+                    var b3dmNameArr = getChildrenName(tilesetJson.root.children,undefined);
+                    for (let i = 0; i < results.length; i++) {
+                        var tilePath = path.join(options.directory , results[i]["name"]);
+                        saveBinary(tilePath, results[i]["b3dm"], options.gzip)
+                    }
+                    console.log("done");
+                })
+            }catch (e) {
+                console.error(e)
+            }
+
+
+            /*return Promise.all([
+                saveTilesetJson(tilesetJsonPath, tilesetJson, options.prettyJson),
+                //saveTile(tilePath, b3dm, options.gzip)
+            ]).then(function (data) {
+                console.log(data);
+            });*/
+
+        })
+
+    });
+
+}
+
+function modifyOctantWithChildren_MinMax(octant,temObj) {
+    temObj = !temObj ? {minX:[],minY:[],minZ:[],maxX:[],maxY:[],maxZ:[]} : temObj;
+    if(octant.children !== null){
+        for (let i = 0; i < octant.children.length; i++){
+            var child = octant.children[i];
+            if(child.children === null){
+                if(!!child.tile){
+                    temObj.minX.push(child.tile.minXYZ[0]);
+                    temObj.minY.push(child.tile.minXYZ[1]);
+                    temObj.minZ.push(child.tile.minXYZ[2]);
+                    temObj.maxX.push(child.tile.maxXYZ[0]);
+                    temObj.maxY.push(child.tile.maxXYZ[1]);
+                    temObj.maxZ.push(child.tile.maxXYZ[2]);
+                }else{
+
+                }
+            }else {
+                modifyOctantWithChildren_MinMax(child,temObj);
+            }
+        }
+    }else{
+        debugger
+    }
+    return temObj;
+}
+
+function modifyOctantMinAndMax(tilesetRootChild,minXYZ,maxXYZ) {
+    // minXYZ = !minXYZ ? new Array(tilesetRootChild.min.x,tilesetRootChild.min.y,tilesetRootChild.min.z) : minXYZ;
+    // maxXYZ = !maxXYZ ? new Array(tilesetRootChild.max.x,tilesetRootChild.max.y,tilesetRootChild.max.z) : maxXYZ;
+    if(tilesetRootChild.children !== null){
+        for (let i = 0; i < tilesetRootChild.children.length; i++) {
+            var child = tilesetRootChild.children[i];
+            if(child.children === null){
+                if(!!child.tile){
+                    minXYZ = !minXYZ ? new Array(child.tile.minXYZ[0],child.tile.minXYZ[1],child.tile.minXYZ[2]) : minXYZ;
+                    maxXYZ = !maxXYZ ? new Array(child.tile.maxXYZ[0],child.tile.maxXYZ[1],child.tile.maxXYZ[2]) : maxXYZ;
+                    if(child.tile.minXYZ[0] <= minXYZ[0]){
+                        minXYZ[0] = child.tile.minXYZ[0];
+                    }
+                    if(child.tile.minXYZ[1] <= minXYZ[1]){
+                        minXYZ[1] = child.tile.minXYZ[1];
+                    }
+                    if(child.tile.minXYZ[2] <= minXYZ[2]){
+                        minXYZ[2] = child.tile.minXYZ[2];
+                    }
+                    if(child.tile.maxXYZ[0] >= maxXYZ[0]){
+                        maxXYZ[0] = child.tile.maxXYZ[0];
+                    }
+                    if(child.tile.maxXYZ[1] >= maxXYZ[1]){
+                        maxXYZ[1] = child.tile.maxXYZ[1];
+                    }
+                    if(child.tile.maxXYZ[2] >= maxXYZ[2]){
+                        maxXYZ[2] = child.tile.maxXYZ[2];
+                    }
+                }else {
+                    var ss = child;
+                    debugger
+                }
+
+            }else {
+                modifyOctantMinAndMax(child,minXYZ,maxXYZ);
+            }
+
+        }
+        if(minXYZ !== undefined ){
+            tilesetRootChild.min.x = minXYZ[0];
+            tilesetRootChild.min.y = minXYZ[1];
+            tilesetRootChild.min.z = minXYZ[2];
+            tilesetRootChild.max.x = maxXYZ[0];
+            tilesetRootChild.max.y = maxXYZ[1];
+            tilesetRootChild.max.z = maxXYZ[2];
+        }
+
+    }else {
+        if(!!tilesetRootChild.tile){
+            /*tilesetRootChild.min.x = tilesetRootChild.tile.minXYZ[0];
+            tilesetRootChild.min.y = tilesetRootChild.tile.minXYZ[1];
+            tilesetRootChild.min.z = tilesetRootChild.tile.minXYZ[2];
+            tilesetRootChild.max.x = tilesetRootChild.tile.maxXYZ[0];
+            tilesetRootChild.max.y = tilesetRootChild.tile.maxXYZ[1];
+            tilesetRootChild.max.z = tilesetRootChild.tile.maxXYZ[2];*/
+        }
+    }
+}
+
+function getChildrenName(children,nameArray) {
+    nameArray = !nameArray ? new Array : nameArray;
+    for (let i = 0; i < children.length; i++) {
+        var child = children[i];
+        if(!!child.content){
+            nameArray.push(child.content.uri);
+        }
+        if(child.hasOwnProperty("children") && child['children'] instanceof Array){
+            getChildrenName(child.children,nameArray);
+        }
+    }
+    return nameArray;
+}
+
+function createB3DMTask(options,children,promiseArray) {
+    promiseArray = !promiseArray ? new Array : promiseArray;
+    for (let i = 0; i < children.length; i++) {
+        var child = children[i];
+        if(!!child.content){
+            options.nameArray = child.content.nameArray;
+            options.b3dmName = child.content.uri;
+            delete child.content['nameArray'];
+            delete child['minXYZ'];
+            delete child['maxXYZ'];
+            promiseArray.push(createB3dmTile(options));
+        }
+        if(child.hasOwnProperty("children") && child['children'] instanceof Array){
+            createB3DMTask(options,child.children,promiseArray);
+            /*for (let j = 0; j < child['children'].length; j++) {
+
+            }*/
+        }
+    }
+    return promiseArray;
+}
+
+function createB3dmTile(options) {
+    var deferred = Cesium.when.defer();
+    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
+    var noParents = defaultValue(options.noParents, false);
+    var multipleParents = defaultValue(options.multipleParents, false);
+    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
+
+
+    // Mesh urls listed in the same order as features in the classIds arrays
+    var urls = options.nameArray;
+    /*urls.forEach(function (value) {
+        value = options.gltfDirectory + value;
+    })*/
+    for (let i = 0; i < urls.length; i++) {
+        urls[i] = options.gltfDirectory + urls[i];
+    }
+    console.log("ssssssssssssss" + urls.length);
+
+
+
+    var instances = createInstances(noParents, multipleParents,urls.length,urls);
     var batchTableJson = createBatchTableJson(instances, options);
 
     var batchTableBinary;
     if (useBatchTableBinary) {
-        batchTableBinary = createBatchTableBinary(batchTableJson, options); // Modifies the json in place
+        batchTableBinary = createBatchTableBinary(batchTableJson, options);  // Modifies the json in place
     }
 
-    // Mesh urls listed in the same order as features in the classIds arrays
-    var urls = [
-        'data/house/doorknob0.gltf',
-        'data/house/doorknob1.gltf',
-        'data/house/doorknob2.gltf',
-        'data/house/doorknob3.gltf',
-        'data/house/door0.gltf',
-        'data/house/door1.gltf',
-        'data/house/door2.gltf',
-        'data/house/door3.gltf',
-        'data/house/roof.gltf',
-        'data/house/wall.gltf'
-    ];
+    /*var buildingPositions = [
+        new Cartesian3(-29.73924456, 79.6033968, 0)     //若ifcopenshell未指定use-world-coord，则导出dae时最顶层mesh包含matrix信息，需要每个ifcElement中转换矩阵的平移量 -y*LengthUnit  x*LengthUnit,对应gltf中的mesh0Matrix
+    ];*/
 
     var buildingPositions = [
-        new Cartesian3(40, 40, 0),
-        new Cartesian3(-30, -20, 0),
-        new Cartesian3(0, 0, 0)
+        new Cartesian3(0,0,0)   //ifcopenshell指定use-world-coord,gltf中顶点位置已含转换信息，无需再做平移变换
     ];
 
     // glTF models are initially y-up, transform to z-up
-    var yUpToZUp = Quaternion.fromAxisAngle(
-        Cartesian3.UNIT_X,
-        CesiumMath.PI_OVER_TWO
-    );
-    var scale = new Cartesian3(5.0, 5.0, 5.0); // Scale the models up a bit
+    var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
+    var zUpRotation90 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, CesiumMath.PI_OVER_TWO);            //每个ifcElement中转换矩阵旋转矩阵为单位阵时使用,cesium1.53版本使用，1.57不用旋转
+    var zUpRotation0 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, 0);
+    var scale = new Cartesian3(1.0, 1.0, 1.0); // Scale the models up a bit
 
     // Local transforms of the buildings within the tile
     var buildingTransforms = [
-        Matrix4.fromTranslationQuaternionRotationScale(
-            buildingPositions[0],
-            yUpToZUp,
-            scale
-        ),
-        Matrix4.fromTranslationQuaternionRotationScale(
-            buildingPositions[1],
-            yUpToZUp,
-            scale
-        ),
-        Matrix4.fromTranslationQuaternionRotationScale(
-            buildingPositions[2],
-            yUpToZUp,
-            scale
-        )
+        Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation90, scale)
     ];
+    /* var buildingTransforms = [
+         Matrix4.fromTranslation(buildingPositions[0])
+     ];*/
 
-    var contentUri =
-        'tile' + calculateFilenameExt(use3dTilesNext, useGlb, '.b3dm');
+
+    var contentUri = options.b3dmName;
     var directory = options.directory;
     var tilePath = path.join(directory, contentUri);
-    var tilesetJsonPath = path.join(directory, 'tileset.json');
 
-    var buildingsLength = 3;
+    var buildingsLength = 1;
     var meshesLength = urls.length;
     var batchLength = buildingsLength * meshesLength;
-    var geometricError = 70.0;
-
-    var box = [0, 0, 10, 50, 0, 0, 0, 50, 0, 0, 0, 10];
-
-    var opts: any = {
-        contentUri: contentUri,
-        geometricError: geometricError,
-        box: box,
-        transform: transform
-    };
-
-    if (use3dTilesNext) {
-        opts.versionNumber = '1.1';
-    }
-
-    var tilesetJson = createTilesetJsonSingle(opts);
-    if (!use3dTilesNext && !options.legacy) {
-        Extensions.addExtensionsUsed(
-            tilesetJson,
-            '3DTILES_batch_table_hierarchy'
-        );
-        Extensions.addExtensionsRequired(
-            tilesetJson,
-            '3DTILES_batch_table_hierarchy'
-        );
-    }
 
     var featureTableJson = {
-        BATCH_LENGTH: batchLength
+        BATCH_LENGTH : batchLength
     };
 
-    return Promise.map(urls, function (url) {
-        return fsExtra.readJson(url).then(function (gltf) {
-            return Mesh.fromGltf(gltf);
-        });
-    })
-        .then(function (meshes) {
-            var meshesLength = meshes.length;
-            var clonedMeshes = [];
-            for (var i = 0; i < buildingsLength; ++i) {
-                for (var j = 0; j < meshesLength; ++j) {
-                    var mesh = Mesh.clone(meshes[j]);
-                    mesh.material = whiteOpaqueMaterial;
-                    mesh.transform(buildingTransforms[i]);
-                    clonedMeshes.push(mesh);
+    return Promise.map(urls, function(url) {
+        //console.log(url);
+        return fsExtra.readJson(url)
+            .then(function(gltf) {
+                try {
+                    return Mesh.fromGltf(gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
+                }catch (e) {
+                    console.error(e);
+                    console.log(url);
                 }
-            }
-            var batchedMesh = Mesh.batch(clonedMeshes);
-
-            if (use3dTilesNext) {
-                return createGltf({
-                    mesh: batchedMesh,
-                    use3dTilesNext: use3dTilesNext
-                });
-            }
-
-            return createGlb({
-                mesh: batchedMesh
+            }).catch(function (reason) {
+                console.error(reason);
             });
-        })
-        .then(function (result) {
-            if (use3dTilesNext) {
-                if (defined(batchTableJson)) {
-                    // add human readable batch table data
-                    if (
-                        defined(batchTableJson) &&
-                        Object.keys(batchTableJson).length > 0
-                    ) {
-                        var batchTableJsonPruned = {
-                            area: batchTableJson.area,
-                            height: batchTableJson.height
-                        };
+    }).then(function(meshes) {
+        var meshesLength = meshes.length;
+        console.log("ssssssss"+ meshesLength);
+        var clonedMeshes = [];
+        for (var i = 0; i < buildingsLength; ++i) {
+            for (var j = 0; j < meshesLength; ++j) {
+                var mesh = Mesh.clone(meshes[j]);
+                //mesh.material = whiteOpaqueMaterial;
+                mesh.transform(buildingTransforms[i]);
+                clonedMeshes.push(mesh);
+            }
+        }
+        var batchedMesh = Mesh.batch(clonedMeshes);
+        //var batchedMesh = clonedMeshes[0];
+        try {
+            return createGltf({
+                mesh : batchedMesh,
+                compressDracoMeshes : compressDracoMeshes,
+                //useBatchIds : false
+            });
+        }catch (e) {
+            console.error(e);
+        }
 
-                        result = createFeatureMetadataExtension(
-                            result,
-                            batchTableJsonPruned,
-                            batchTableBinary
-                        ) as Gltf;
+    }).then(function(glb) {
+        console.log(glb);
+        var b3dm = createB3dm({
+            glb : glb,
+            featureTableJson : featureTableJson,
+            batchTableJson : batchTableJson,
+            batchTableBinary : batchTableBinary
+        });
+        deferred.resolve({
+            b3dm : b3dm,
+            name : contentUri
+        });
+        return deferred.promise;
+        /*return Promise.all([
+            //saveTilesetJson(tilesetJsonPath, tilesetJson, options.prettyJson),
+            saveTile(tilePath, b3dm, options.gzip)
+        ]).then(function () {
+            deferred.resolve();
+            return deferred.promise;
+        });*/
+    });
+}
 
-                        const hierarchy = batchTableJson.tilesNextHierarchy;
+function createB3dmTile11(options) {
+    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
+    var noParents = defaultValue(options.noParents, false);
+    var multipleParents = defaultValue(options.multipleParents, false);
+    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-                        if (defined(hierarchy)) {
-                            addHierarchyToGltf(
-                                hierarchy,
-                                result,
-                                batchTableBinary
-                            );
+
+    // Mesh urls listed in the same order as features in the classIds arrays
+    var urls = [];
+    return fsExtra.readFile("data/sample_wall/name.txt", 'utf-8', function (err,data) {
+        if(err){
+            console.error(err);
+        }
+        else{
+            //console.log(data);
+            var str_array = data.split(",");
+            str_array.forEach(function (value) {
+                urls.push('data/sample_wall/'+value);
+            })
+            console.log("ssssssssssssss" + urls.length);
+
+
+
+            var instances = createInstances(noParents, multipleParents,urls.length,urls);
+            var batchTableJson = createBatchTableJson(instances, options);
+
+            var batchTableBinary;
+            if (useBatchTableBinary) {
+                batchTableBinary = createBatchTableBinary(batchTableJson, options);  // Modifies the json in place
+            }
+
+            /*var buildingPositions = [
+                new Cartesian3(-29.73924456, 79.6033968, 0)     //若ifcopenshell未指定use-world-coord，则导出dae时最顶层mesh包含matrix信息，需要每个ifcElement中转换矩阵的平移量 -y*LengthUnit  x*LengthUnit,对应gltf中的mesh0Matrix
+            ];*/
+
+            var buildingPositions = [
+                new Cartesian3(0,0,0)   //ifcopenshell指定use-world-coord,gltf中顶点位置已含转换信息，无需再做平移变换
+            ];
+
+            // glTF models are initially y-up, transform to z-up
+            var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
+            var zUpRotation0 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, 0);            //每个ifcElement中转换矩阵旋转矩阵为单位阵时使用
+            var scale = new Cartesian3(1.0, 1.0, 1.0); // Scale the models up a bit
+
+            // Local transforms of the buildings within the tile
+            var buildingTransforms = [
+                Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation0, scale)
+            ];
+            /* var buildingTransforms = [
+                 Matrix4.fromTranslation(buildingPositions[0])
+             ];*/
+
+
+            var contentUri = 'tile.b3dm';
+            var directory = options.directory;
+            var tilePath = path.join(directory, contentUri);
+            var tilesetJsonPath = path.join(directory, 'tileset.json');
+
+            var buildingsLength = 1;
+            var meshesLength = urls.length;
+            var batchLength = buildingsLength * meshesLength;
+            var geometricError = 70.0;
+
+            var box = [
+                -22.48, 52.06, 5.33,
+                78.55, 0, 0,
+                0, 159.535, 0,
+                0, 0, 7.155
+            ];
+            /* var box = [
+                 0, 0, -1.17,
+                 10, 0, 0,
+                 0, 10, 0,
+                 0, 0, 6.955
+             ];*/
+            /* var box = [
+                 0, 0, 10,
+                 50, 0, 0,
+                 0, 50, 0,
+                 0, 0, 10
+             ];*/
+
+            var tilesetJson = createTilesetJsonSingle({
+                contentUri : contentUri,
+                geometricError : geometricError,
+                box : box,
+                transform : transform
+            } as any);
+
+            if (!options.legacy) {
+                Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
+                Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
+            }
+
+            var featureTableJson = {
+                BATCH_LENGTH : batchLength
+            };
+
+            return Promise.map(urls, function(url) {
+                //console.log(url);
+                return fsExtra.readJson(url)
+                    .then(function(gltf) {
+                        try {
+                            return Mesh.fromGltf(gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
+                        }catch (e) {
+                            console.error(e);
+                            console.log(url);
                         }
+                    }).catch(function (reason) {
+                        console.error(reason);
+                    });
+            }).then(function(meshes) {
+                var meshesLength = meshes.length;
+                console.log("ssssssss"+ meshesLength);
+                var clonedMeshes = [];
+                for (var i = 0; i < buildingsLength; ++i) {
+                    for (var j = 0; j < meshesLength; ++j) {
+                        var mesh = Mesh.clone(meshes[j]);
+                        //mesh.material = whiteOpaqueMaterial;
+                        mesh.transform(buildingTransforms[i]);
+                        clonedMeshes.push(mesh);
                     }
                 }
-
-                if (!useGlb) {
-                    return Promise.all([
-                        saveJson(tilePath, result, options.prettyJson, gzip),
-                        saveJson(
-                            tilesetJsonPath,
-                            tilesetJson,
-                            options.prettyJson,
-                            gzip
-                        )
-                    ]);
-                } else {
-                    return Promise.all([
-                        gltfToGlb(result, gltfConversionOptions).then(function (
-                            out
-                        ) {
-                            return saveBinary(tilePath, out.glb, gzip);
-                        }),
-                        saveJson(
-                            tilesetJsonPath,
-                            tilesetJson,
-                            options.prettyJson,
-                            gzip
-                        )
-                    ]);
+                var batchedMesh = Mesh.batch(clonedMeshes);
+                //var batchedMesh = clonedMeshes[0];
+                try {
+                    return createGltf({
+                        mesh : batchedMesh,
+                        compressDracoMeshes : compressDracoMeshes,
+                        //useBatchIds : false
+                    });
+                }catch (e) {
+                    console.error(e);
                 }
-            }
 
-            var b3dm = createB3dm({
-                glb: result,
-                featureTableJson: featureTableJson,
-                batchTableJson: batchTableJson,
-                batchTableBinary: batchTableBinary
+            }).then(function(glb) {
+                console.log(glb);
+                var b3dm = createB3dm({
+                    glb : glb,
+                    featureTableJson : featureTableJson,
+                    batchTableJson : batchTableJson,
+                    batchTableBinary : batchTableBinary
+                });
+                return Promise.all([
+                    saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
+                    saveBinary(tilePath, b3dm, options.gzip)
+                ]);
             });
+        }
+    });
+}
 
-            // legacy b3dm
-            return Promise.all([
-                saveJson(
-                    tilesetJsonPath,
-                    tilesetJson,
-                    options.prettyJson,
-                    gzip
-                ),
-                saveBinary(tilePath, b3dm, gzip)
-            ]);
-        });
+function deleteNull(tempObj) {
+    for (let i = tempObj.children.length - 1; i >= 0; i--) {
+        var child = tempObj.children[i];
+        if(child === undefined){
+            tempObj.children.splice(i,1);
+        }
+        if(!!child && child.children instanceof Array){
+            deleteNull(child);
+        }
+    }
+}
+
+function computeOctantBoundingbox(minObj,maxobj) {
+    var boundingBox = {
+        box:[]
+    };
+    var center = {};
+    center["x"] = (minObj.x + maxobj.x) / 2;
+    center["y"] = (minObj.y + maxobj.y) / 2;
+    center["z"] = (minObj.z + maxobj.z) / 2;
+    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
+
+
+    var dimensions = {};
+    dimensions["x"] = maxobj.x - minObj.x;
+    dimensions["y"] = maxobj.y - minObj.y;
+    dimensions["z"] = maxobj.z - minObj.z;
+    var box = [
+        center["z"] , center["x"] , center["y"],
+        dimensions["z"] / 2, 0 , 0,
+        0 , dimensions["x"] / 2,0,
+        0 , 0 , dimensions["y"] / 2
+    ];
+    boundingBox.box = box;
+    return boundingBox;
+}
+function computeOctantBoundingbox22(minObj,maxobj) {
+    var boundingBox = {
+        box:[]
+    };
+    var center = {};
+    center["x"] = (minObj.x + maxobj.x) / 2;
+    center["y"] = (minObj.y + maxobj.y) / 2;
+    center["z"] = (minObj.z + maxobj.z) / 2;
+    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
+
+
+    var dimensions = {};
+    dimensions["x"] = maxobj.x - minObj.x;
+    dimensions["y"] = maxobj.y - minObj.y;
+    dimensions["z"] = maxobj.z - minObj.z;
+    var box = [
+        center["x"] , center["y"] , center["z"],
+        dimensions["x"] / 2, 0 , 0,
+        0 , dimensions["y"] / 2,0,
+        0 , 0 , dimensions["z"] / 2
+    ];
+    boundingBox.box = box;
+    return boundingBox;
+}
+
+function getRootJSONFromOctree(octreeRoot){
+    var tempObj = octreeRoot;
+    if(tempObj.children !== null){
+        tempObj.boundingVolume = computeOctantBoundingbox(tempObj['min'],tempObj['max']);
+        tempObj.geometricError = computeSSEFromBox(tempObj.boundingVolume.box);
+        delete tempObj['data'];
+        delete tempObj['points'];
+        delete tempObj['min'];
+        delete tempObj['max'];
+        delete tempObj['tile'];
+
+        for (let i = tempObj.children.length - 1; i >= 0; i--) {
+            var child = tempObj.children[i];
+            if(child.children === null && child.tile === null){
+                tempObj.children.splice(i,1);
+            }else if(child.children === null && child.tile !== null){
+                tempObj.children[i] = child.tile;
+            }else if(child.children !== null){
+                child.boundingVolume = computeOctantBoundingbox(child['min'],child['max']);
+                child.geometricError = computeSSEFromBox(child.boundingVolume.box);
+                getRootJSONFromOctree(child);
+            }else if(child.children !== null && child.tile !== null){
+
+            }
+        }
+    }else if(tempObj.children === null && tempObj.tile === null){
+        tempObj = {};
+    }else if(tempObj.children === null && tempObj.tile !== null){
+        tempObj = tempObj.tile;
+    }
+    return tempObj;
+}
+
+function computeTile(ocantData,indicesArr) {
+    var tile = {
+        boundingVolume:{},
+        children : [],
+        content:{},
+        geometricError:0.0,
+        refine:"ADD"
+    };
+    var nameArray = [];
+    var minX = []; var minY = []; var minZ = [];
+    var maxX = []; var maxY = []; var maxZ = [];
+    for (let i = 0; i < ocantData.length; i++) {
+        var obj = ocantData[i];
+        nameArray.push(obj.name);
+        minX.push(obj.value.minXYZ[0]); minY.push(obj.value.minXYZ[1]); minZ.push(obj.value.minXYZ[2]);
+        maxX.push(obj.value.maxXYZ[0]); maxY.push(obj.value.maxXYZ[1]); maxZ.push(obj.value.maxXYZ[2]);
+    }
+    var tileMinXYZ = [Math.min.apply(null, minX),Math.min.apply(null, minY),Math.min.apply(null, minZ)];
+    var tileMaxXYZ = [Math.max.apply(null, maxX),Math.max.apply(null, maxY),Math.max.apply(null, maxZ)];
+
+    var center = {};
+    center["x"] = (tileMinXYZ[0] + tileMaxXYZ[0]) / 2;
+    center["y"] = (tileMinXYZ[1] + tileMaxXYZ[1]) / 2;
+    center["z"] = (tileMinXYZ[2] + tileMaxXYZ[2]) / 2;
+    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
+
+
+    var dimensions = {};
+    dimensions["x"] = tileMaxXYZ[0] - tileMinXYZ[0];
+    dimensions["y"] = tileMaxXYZ[1] - tileMinXYZ[1];
+    dimensions["z"] = tileMaxXYZ[2] - tileMinXYZ[2];
+    var box = [
+        center["z"] , center["x"] , center["y"],
+        dimensions["z"] / 2, 0 , 0,
+        0 , dimensions["x"] / 2,0,
+        0 , 0 , dimensions["y"] / 2
+    ];
+
+    var boundsCenter = new Cartesian3(center["x"],center["y"],center["z"]);
+    var boundsMax = new Cartesian3(tileMaxXYZ[0],tileMaxXYZ[1],tileMaxXYZ[2]);
+    tile.geometricError = Cartesian3.distance(boundsCenter,boundsMax) * 2;
+    tile.boundingVolume["box"] = box;
+    tile.content["nameArray"] = nameArray;
+    tile.content["uri"] = indicesArr.join('-') + ".b3dm";
+    if(tile.children.length === 0){
+        delete tile['children'];
+    }
+    tile["minXYZ"] = tileMinXYZ;
+    tile["maxXYZ"] = tileMaxXYZ;
+    return tile;
+}
+// 2020
+function computeSSEFromBox(box,useXYZ?:boolean) {
+    var bounds = {
+        center:{
+            x : box[0], y: box[1], z: box[2]
+        },
+        dimensions:{
+            x: box[3] * 2,
+            y: box[7] * 2,
+            z: box[11] * 2
+        }
+    }
+    var SSE = 0.0;
+    var boundsCenter = new Cartesian3(bounds.center.x,bounds.center.y,bounds.center.z);
+    var boundsMax = new Cartesian3(
+        bounds.center.x + bounds.dimensions.x * 0.5,
+        bounds.center.y + bounds.dimensions.y * 0.5,
+        bounds.center.z + bounds.dimensions.z * 0.5
+    );
+    if(!!useXYZ){
+        var xyzArr = [bounds.dimensions.x,bounds.dimensions.y,bounds.dimensions.z];
+        SSE = Math.min.apply(null, xyzArr);
+    }else {
+        SSE = Cartesian3.distance(boundsCenter,boundsMax) * 2;
+    }
+    return SSE;
+}
+
+function computeSSE(bounds) {
+    var SSE = 0.0;
+    var boundsCenter = new Cartesian3(bounds.center.x,bounds.center.y,bounds.center.z);
+    var boundsMax = new Cartesian3(
+        bounds.center.x + bounds.dimensions.x * 0.5,
+        bounds.center.y + bounds.dimensions.y * 0.5,
+        bounds.center.z + bounds.dimensions.z * 0.5
+    );
+    SSE = Cartesian3.distance(boundsCenter,boundsMax) * 2;
+    return SSE;
 }
 
 function createFloatBuffer(values) {
@@ -560,7 +1158,82 @@ function addHierarchyToGltf(hierarchy: any, gltf: Gltf, binary: Buffer) {
     );
 }
 
-function createInstances(noParents, multipleParents) {
+function createInstances(noParents, multipleParents,count,urls) {
+    var propertyArray = [];
+    console.log(urls);
+    urls.forEach(function (value,index,array) {
+        var separator = value.lastIndexOf("/");
+        var extension = value.indexOf(".gltf");
+        value = value.substring(separator + 1,extension);    //0H1nVTTAv6LhM6_nm3wfNy--IfcDoor
+        value = value.split("--");
+        propertyArray.push(value);
+    })
+    var instanceArray = [];
+    for (var i = 0; i < count; i++) {
+        var instance = {
+            instance : {
+                className : propertyArray[i].join("--"),
+                properties : {
+                    guid : propertyArray[i][0]
+                }
+            },
+            properties : {
+                guid : propertyArray[i][0],
+                ifc_type : propertyArray[i][1]
+            }
+        };
+        instanceArray.push(instance);
+    }
+
+    if (noParents) {
+        return instanceArray;
+    }
+
+    if (multipleParents) {
+
+        return instanceArray;
+    }
+    return instanceArray;
+}
+
+function createInstances11(noParents, multipleParents,count,urls) {
+    console.log(urls);
+    urls.forEach(function (value,index,array) {
+        var separator = value.lastIndexOf("/");
+        var extension = value.indexOf(".gltf");
+        value = value.substring(separator + 1,extension);    //0H1nVTTAv6LhM6_nm3wfNy--IfcDoor
+    })
+    var instanceArray = [];
+    for (var i = 0; i < count; i++) {
+        var instance = {
+            instance : {
+                className : 'wall',
+                properties : {
+                    wall_name : 'wall0',
+                    wall_paint : 'pink',
+                    wall_windows : 1
+                }
+            },
+            properties : {
+                guid : 10.0,
+                ifc_type : 20.0
+            }
+        };
+        instanceArray.push(instance);
+    }
+
+    if (noParents) {
+        return instanceArray;
+    }
+
+    if (multipleParents) {
+
+        return instanceArray;
+    }
+    return instanceArray;
+}
+
+function createInstances22(noParents, multipleParents) {
     var door0: any = {
         instance: {
             className: 'door',

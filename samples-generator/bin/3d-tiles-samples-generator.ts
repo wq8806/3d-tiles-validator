@@ -1373,6 +1373,11 @@ async function savePointCloudTimeDynamic(name, options) {
 }
 
 function createHierarchy() {
+    var zUpRotation90 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, CesiumMath.PI_OVER_TWO);
+    var angle = Quaternion.computeAngle(zUpRotation90);
+    //var rotationMatrix = Cesium.Matrix3.fromQuaternion(zUpRotation90);
+    //var transformMatrix4 = Matrix4.fromRotationTranslation(rotationMatrix,Cartesian3.ZERO);
+    //buildingsTransform = Cesium.Transforms.headingPitchRollToFixedFrame(Cartesian3.fromRadians(longitude, latitude, 0.0), new Cesium.HeadingPitchRoll(angle,0,0));
     return createBatchTableHierarchy({
         directory: path.join(
             outputDirectory,
@@ -1380,10 +1385,11 @@ function createHierarchy() {
             'BatchTableHierarchy'
         ),
         transform: buildingsTransform,
-        gzip: gzip,
+        gzip: false, //gzip,
         prettyJson: prettyJson,
         use3dTilesNext: argv['3d-tiles-next'],
-        useGlb: argv.glb
+        useGlb: argv.glb,
+        compressDracoMeshes: false
     });
 }
 

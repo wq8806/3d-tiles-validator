@@ -74,7 +74,7 @@ export function createTilesetJsonSingle(options: TilesetOption): TilesetJson {
             expire: options.expire,
             refine: 'ADD',
             boundingVolume: boundingVolume,
-            geometricError: 0.0,
+            geometricError: options.geometricError,
             content: {
                 uri: options.contentUri
             }

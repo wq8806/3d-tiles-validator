@@ -1,4 +1,4 @@
-import { FLOAT32_SIZE_BYTES, UINT16_SIZE_BYTES } from './typeSize';
+import { FLOAT32_SIZE_BYTES, UINT16_SIZE_BYTES, UINT32_SIZE_BYTES } from './typeSize';
 
 export function bufferToUint16Array(
     buffer: Buffer,
@@ -12,6 +12,20 @@ export function bufferToUint16Array(
         );
     }
     return uint16Array;
+}
+
+export function bufferToUint32Array(
+    buffer: Buffer,
+    byteOffset: number,
+    length: number
+) {
+    const uint32Array = new Uint32Array(length);
+    for (let i = 0; i < length; ++i) {
+        uint32Array[i] = buffer.readUInt32LE(
+            byteOffset + i * UINT32_SIZE_BYTES
+        );
+    }
+    return uint32Array;
 }
 
 export function bufferToFloat32Array(

@@ -1,6 +1,6 @@
 import { Material } from './Material';
 import { MeshView } from './meshView';
-import { bufferToUint16Array, bufferToFloat32Array } from './bufferUtil';
+import { bufferToUint16Array,bufferToUint32Array, bufferToFloat32Array } from './bufferUtil';
 import { Gltf } from './gltfType';
 const Cesium = require('cesium');
 const util = require('./utility');
@@ -12,7 +12,8 @@ const Matrix4 = Cesium.Matrix4;
 
 const typeToNumberOfComponents = util.typeToNumberOfComponents;
 
-const sizeOfUint16 = 2;
+const sizeOfUint16 = 2;     //sizeOf datatype in bytes
+const sizeOfUint32 = 4;
 const sizeOfFloat32 = 4;
 
 const whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
@@ -29,6 +30,7 @@ export class Mesh {
     batchIds?: number[];
     material?: Material;
     views?: MeshView[];
+    hasUint32indeces?:boolean;
 
     /**
      * Stores the vertex attributes and indices describing a mesh.
@@ -59,7 +61,8 @@ export class Mesh {
         vertexColors: number[],
         batchIds?: number[],
         material?: Material,
-        views?: MeshView[]
+        views?: MeshView[],
+        hasUint32indeces?: boolean
     ) {
         this.indices = indices;
         this.positions = positions;
@@ -69,6 +72,7 @@ export class Mesh {
         this.batchIds = batchIds;
         this.material = material;
         this.views = views;
+        this.hasUint32indeces = hasUint32indeces === undefined ? false : hasUint32indeces;
     }
 
     /**
@@ -190,13 +194,18 @@ export class Mesh {
         let batchedBatchIds = [];
         let batchedIndices = [];
 
+        let batchedHasUint32indeces = false;
         let startIndex = 0;
         let indexOffset = 0;
         const views = [];
+        let batchedIndices11 = [];
         let currentView;
         const meshesLength = meshes.length;
         for (let i = 0; i < meshesLength; ++i) {
             const mesh = meshes[i];
+            if(mesh.hasUint32indeces){
+                batchedHasUint32indeces = true;
+            }
             const positions = mesh.positions;
             const normals = mesh.normals;
             const uvs = mesh.uvs;
@@ -216,7 +225,7 @@ export class Mesh {
             const indices = mesh.indices;
             const indicesLength = indices.length;
 
-            if (
+            /*if (
                 !defined(currentView) ||
                 currentView.material !== mesh.material
             ) {
@@ -228,11 +237,90 @@ export class Mesh {
                 views.push(currentView);
             } else {
                 currentView.indexCount += indicesLength;
-            }
+            }*/
 
             for (let j = 0; j < indicesLength; ++j) {
                 const index = indices[j] + startIndex;
+                if(index > 65535){
+                    batchedHasUint32indeces = true;
+                }
                 batchedIndices.push(index);
+            }
+
+            for (var j = 0; j < mesh.views.length; ++j) {
+                if(i === meshesLength - 1){
+                    debugger;
+                }
+
+                /*if(!defined(currentView) || !findSameMaterial(currentView,mesh.views)){
+                    currentView = new MeshView({
+                        material : mesh.views[j].material,
+                        indexOffset : mesh.views[j].indexOffset + indexOffset,
+                        indexCount : mesh.views[j].indexCount
+                    })
+                    views.push(currentView);
+                }else {
+                    currentView.indexCount += mesh.views[j].indexCount;
+                }*/
+
+                /*mesh.views[j].indexOffset += indexOffset;
+                views.push(mesh.views[j]);*/
+                try {
+                    var sameInViews = getSameMaterial(views,mesh.views[j]);
+
+                    if(sameInViews === null){
+                        mesh.views[j].indexOffset += indexOffset;
+                        var tempIndices = batchedIndices.slice(mesh.views[j].indexOffset,mesh.views[j].indexOffset + mesh.views[j].indexCount);
+                        if(views.length > 0 && !!views[views.length -1]){
+                            mesh.views[j].indexOffset = views[views.length - 1].indexOffset + views[views.length - 1].indexCount;
+                        }
+                        views.push(mesh.views[j]);
+                        /*tempIndices.forEach(function (value, index, array) {
+                            batchedIndices11.splice(mesh.views[j].indexOffset,0,tempIndices);
+                        })*/
+                        batchedIndices11 = batchedIndices11.concat(tempIndices);
+                    }else {
+                        mesh.views[j].indexOffset += indexOffset;
+                        var tempIndices = batchedIndices.slice(mesh.views[j].indexOffset,mesh.views[j].indexOffset + mesh.views[j].indexCount);
+
+                        var viewIndex = views.indexOf(sameInViews);
+                        if(viewIndex > 0){
+                            //sameInViews.indexOffset = views[viewIndex-1].indexOffset + views[viewIndex-1].indexCount;
+                            tempIndices.forEach(function (value, index, array) {
+                                batchedIndices11.splice(sameInViews.indexOffset + sameInViews.indexCount + index,0,value);
+                            })
+                            /*for (let k = 0; k < tempIndices.length; k++) {
+                                batchedIndices11.splice(sameInViews.indexOffset + sameInViews.indexCount + k,0,tempIndices[k]);
+                            }*/
+                            sameInViews.indexCount = sameInViews.indexCount + mesh.views[j].indexCount;
+                            /*if(!!views[viewIndex + 1]){
+                                views[viewIndex + 1].indexOffset = sameInViews.indexOffset + sameInViews.indexCount;
+                                // views[viewIndex + 1].indexOffset = views[viewIndex + 1].indexOffset + mesh.views[j].indexCount;
+                            }*/
+                            for (let k = 1; viewIndex + k < views.length; k++) {     //后续的viewoffset都需要改变
+                                views[viewIndex + k].indexOffset = views[viewIndex + k -1].indexOffset + views[viewIndex + k -1].indexCount;
+                            }
+                        }else {
+                            if(!!views[viewIndex -1]){
+                                //sameInViews.indexOffset = views[viewIndex-1].indexOffset + views[viewIndex-1].indexCount;
+                            }
+                            tempIndices.forEach(function (value, index, array) {
+                                batchedIndices11.splice(sameInViews.indexOffset + sameInViews.indexCount + index,0,value);
+                            })
+                            sameInViews.indexCount = sameInViews.indexCount + mesh.views[j].indexCount;
+                            for (let k = 1; viewIndex + k < views.length; k++) {
+                                views[viewIndex + k].indexOffset = views[viewIndex + k -1].indexOffset + views[viewIndex + k -1].indexCount;
+                            }
+                        }
+                        // sameInViews.indexCount = sameInViews.indexCount + mesh.views[j].indexCount;
+
+                    }
+                }catch (e) {
+                    console.error(e);
+                    console.log(views);
+                    console.log(i);
+                }
+
             }
             startIndex += vertexCount;
             indexOffset += indicesLength;
@@ -246,7 +334,8 @@ export class Mesh {
             batchedVertexColors,
             batchedBatchIds,
             undefined,
-            views
+            views,
+            batchedHasUint32indeces
         );
     }
 
@@ -265,7 +354,9 @@ export class Mesh {
             mesh.uvs.slice(),
             mesh.vertexColors.slice(),
             undefined,
-            mesh.material
+            mesh.material,
+            mesh.views,
+            mesh.hasUint32indeces
         );
     }
 
@@ -277,28 +368,28 @@ export class Mesh {
 
     static createCube(): Mesh {
         // prettier-ignore
-        const indices = [0, 1, 2, 0, 2, 3, 6, 5, 4, 7, 6, 4, 8, 9, 10, 8, 10, 
-            11, 14, 13, 12, 15, 14, 12, 18, 17, 16, 19, 18, 16, 20, 21, 22, 20, 
+        const indices = [0, 1, 2, 0, 2, 3, 6, 5, 4, 7, 6, 4, 8, 9, 10, 8, 10,
+            11, 14, 13, 12, 15, 14, 12, 18, 17, 16, 19, 18, 16, 20, 21, 22, 20,
             22, 23];
         // prettier-ignore
-        const positions = [-0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 
-            0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 
-            0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 
-            -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 
-            -0.5, 0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 
+        const positions = [-0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
+            0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5,
+            0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5,
+            -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5,
+            -0.5, 0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, -0.5, 0.5,
             0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5,
              0.5];
         // prettier-ignore
-        const normals = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 
-            1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 
-            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 
-            0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 
-            0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 
+        const normals = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0,
+            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0,
+            0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0,
             0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0];
         // prettier-ignore
-        const uvs = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 
-            0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 
-            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 
+        const uvs = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
             1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
         // prettier-ignore
         const vertexColors = new Array(24 * 4).fill(0);
@@ -306,14 +397,14 @@ export class Mesh {
     }
 
     /**
-     * Creates a mesh from a glTF. This utility is designed only for simple 
+     * Creates a mesh from a glTF. This utility is designed only for simple
      * glTFs like those in the data folder.
      *
      * @param {Object} gltf The glTF.
      * @returns {Mesh} The mesh.
      */
     static fromGltf(gltf: Gltf): Mesh {
-        const gltfPrimitive = gltf.meshes[0].primitives[0];
+        /*const gltfPrimitive = gltf.meshes[0].primitives[0];
         const gltfMaterial = gltf.materials[gltfPrimitive.material];
         const material = Material.fromGltf(gltfMaterial);
         const indices = getAccessor(gltf, gltf.accessors[gltfPrimitive.indices]);
@@ -335,6 +426,83 @@ export class Mesh {
             vertexColors,
             undefined,
             material
+        );*/
+        const gltfPrimitiveArray = gltf.meshes[0].primitives;
+        let gltfPositions = [];
+        let gltfNormals = [];
+        let gltfUvs = [];
+        let gltfVertexColors = [];
+        let batchedBatchIds = [];
+        let gltfIndices = [];
+        let gltfHasUint32indeces = false;
+
+        let startIndex = 0;
+        let indexOffset = 0;
+        let views:MeshView[] = [];
+        let currentView;
+        const primitivesLength = gltfPrimitiveArray.length;
+        for (var i = 0; i < primitivesLength; ++i) {
+            var primitive = gltfPrimitiveArray[i];        //部分缺失
+            var primitiveMaterial = gltf.materials[primitive.material];
+            var material = Material.fromGltf(primitiveMaterial);
+            var indicesAccessor = gltf.accessors[primitive.indices];
+            var indices = getAccessor(gltf, indicesAccessor);
+            if (indicesAccessor.componentType === ComponentDatatype.UNSIGNED_INT){
+                gltfHasUint32indeces = true;
+            }
+            var positions = getAccessor(gltf, gltf.accessors[primitive.attributes.POSITION]);
+            var normals = getAccessor(gltf, gltf.accessors[primitive.attributes.NORMAL]);
+            var uvs = new Array(positions.length / 3 * 2).fill(0);
+            var vertexColors = new Array(positions.length / 3 * 4).fill(0);
+
+
+
+            //var mesh = meshes[i];
+
+            var vertexCount = positions.length / 3;
+            var batchIds = new Array(vertexCount).fill(i);
+
+            gltfPositions = gltfPositions.concat(positions);
+            gltfNormals = gltfNormals.concat(normals);
+            gltfUvs = gltfUvs.concat(uvs);
+            gltfVertexColors = gltfVertexColors.concat(vertexColors);
+
+            // Generate indices and mesh views
+            //var indices = mesh.indices;
+            var indicesLength = indices.length;
+
+            if (!defined(currentView) || (currentView.material !== material)) {
+                currentView = new MeshView(
+                    material,
+                    indexOffset,
+                    indicesLength
+                );
+                views.push(currentView);
+            } else {
+                currentView.indexCount += indicesLength;
+            }
+
+            for (var j = 0; j < indicesLength; ++j) {
+                var index = indices[j] + startIndex;
+                if(index > 65535){
+                    gltfHasUint32indeces = true;
+                }
+                gltfIndices.push(index);
+            }
+            startIndex += vertexCount;
+            indexOffset += indicesLength;
+        }
+
+        return new Mesh(
+            gltfIndices,
+            gltfPositions,
+            gltfNormals,
+            gltfUvs,
+            gltfVertexColors,
+            batchedBatchIds,
+            undefined,
+            views,
+            gltfHasUint32indeces
         );
     };
 }
@@ -352,6 +520,44 @@ function getAccessor(gltf, accessor) {
         typedArray = bufferToUint16Array(data, byteOffset, length);
     } else if (accessor.componentType === ComponentDatatype.FLOAT) {
         typedArray = bufferToFloat32Array(data, byteOffset, length);
+    } else if (accessor.componentType === ComponentDatatype.UNSIGNED_INT){   //较少出现，顶点索引 > 65536时
+        this
+        typedArray = bufferToUint32Array(data, byteOffset, length);
     }
     return Array.prototype.slice.call(typedArray);
+}
+
+function findSameMaterial(view,views){
+    for (let i = 0; i < views.length; i++) {
+        if(views[i].material.baseColor[0] === view.material.baseColor[0] &&
+            views[i].material.baseColor[1] === view.material.baseColor[1] &&
+            views[i].material.baseColor[2] === view.material.baseColor[2] &&
+            views[i].material.baseColor[3] === view.material.baseColor[3]){
+            return true;
+        }
+    }
+    return false;
+}
+
+function getSameMaterial(views,view) {
+    for (let i = 0; i < views.length; i++) {
+        if(views[i].material.baseColor[0] === view.material.baseColor[0] &&
+            views[i].material.baseColor[1] === view.material.baseColor[1] &&
+            views[i].material.baseColor[2] === view.material.baseColor[2] &&
+            views[i].material.baseColor[3] === view.material.baseColor[3]){
+            return views[i];
+        }
+    }
+    return null;
+}
+function isSameMaterialView(view1,view2){
+
+    if(view1.material.baseColor[0] === view2.material.baseColor[0] &&
+        view1.material.baseColor[1] === view2.material.baseColor[1] &&
+        view1.material.baseColor[2] === view2.material.baseColor[2] &&
+        view1.material.baseColor[3] === view2.material.baseColor[3]){
+        return true;
+    }
+
+    return false;
 }

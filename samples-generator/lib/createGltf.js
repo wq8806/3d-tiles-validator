@@ -1,14 +1,21 @@
 'use strict';
 var Cesium = require('cesium');
 var getBufferPadded = require('./getBufferPadded');
+var path = require('path');
 var defaultValue = Cesium.defaultValue;
 var defined = Cesium.defined;
 var getMinMax = require('./getMinMax');
 
+var gltfPipeline = require('gltf-pipeline');
+var gltfToGlb = gltfPipeline.gltfToGlb;
+
 module.exports = createGltf;
+
+var rootDirectory = path.join(__dirname, '../');
 
 var sizeOfUint8 = 1;
 var sizeOfUint16 = 2;
+var sizeOfUint32 = 4;
 var sizeOfFloat32 = 4;
 
 /**
@@ -21,6 +28,7 @@ var sizeOfFloat32 = 4;
  * @param {Boolean} [options.deprecated=false] Save the glTF with the old BATCHID semantic.
  * @param {Boolean} [options.use3dTilesNext=false] Modify the GLTF to name batch ids with a numerical suffix
  * @param {Boolean} [options.animated=false] Whether to include glTF animations.
+ * @param {Boolean} [options.compressDracoMeshes] use compressDraco or not
  * @todo options.use3dTilesNext will be deprecated soon, all 3dtilesnext logic
  *       will go into a dedicated class.
  *
@@ -32,6 +40,7 @@ function createGltf(options) {
     var useBatchIds = defaultValue(options.useBatchIds, true);
     var relativeToCenter = defaultValue(options.relativeToCenter, false);
     var deprecated = defaultValue(options.deprecated, false);
+    var compressDracoMeshes = defaultValue(options.compressDracoMeshes,false);
     var animated = defaultValue(options.animated, false);
 
     var mesh = options.mesh;
@@ -42,6 +51,7 @@ function createGltf(options) {
     var batchIds = mesh.batchIds;
     var indices = mesh.indices;
     var views = mesh.views;
+    var hasUint32indeces = mesh.hasUint32indeces;
 
     // If all the vertex colors are 0 then the mesh does not have vertex colors
     var useVertexColors = !vertexColors.every(function(element) {return element === 0;});
@@ -123,11 +133,28 @@ function createGltf(options) {
     }
 
     var indicesLength = indices.length;
-    var indexBuffer = Buffer.alloc(indicesLength * sizeOfUint16);
+    var indexBuffer;
+    if(!hasUint32indeces){
+        indexBuffer = Buffer.alloc(indicesLength * sizeOfUint16);
+        for (i = 0; i < indicesLength; ++i) {
+            //try {
+            indexBuffer.writeUInt16LE(indices[i], i * sizeOfUint16);   // writeUInt16LE 最大值为65535，很容易超限
+            //}catch (e) {
+            //console.error(e);
+            //console.log(indices[i]);
+            //}
+        }
+    }else{
+        indexBuffer = Buffer.alloc(indicesLength * sizeOfUint32);
+        for (i = 0; i < indicesLength; ++i) {
+            indexBuffer.writeUInt32LE(indices[i], i * sizeOfUint32);
+        }
+    }
+    /*var indexBuffer = Buffer.alloc(indicesLength * sizeOfUint16);
     for (i = 0; i < indicesLength; ++i) {
         indexBuffer.writeUInt16LE(indices[i], i * sizeOfUint16);
     }
-    indexBuffer = getBufferPadded(indexBuffer);
+    indexBuffer = getBufferPadded(indexBuffer);*/
 
     var translations = [
         [0.0, 0.0, 0.0],
@@ -518,7 +545,7 @@ function createGltf(options) {
         accessors : accessors,
         animations : animations,
         asset : {
-            generator : '3d-tiles-samples-generator',
+            generator : 'ts-gis',
             version : '2.0'
         },
         buffers : [{
@@ -542,5 +569,35 @@ function createGltf(options) {
         textures : textures
     };
 
-    return gltf;
+    // return gltf;
+    var compressDracoMeshesdefaults = {
+        compressionLevel: 7,
+        quantizePositionBits: 14,
+        quantizeNormalBits: 10,
+        quantizeTexcoordBits: 12,
+        quantizeColorBits: 8,
+        //quantizeSkinBits: 12,
+        quantizeGenericBits: 12,
+        uncompressedFallback: false,
+        unifiedQuantization: false
+    };
+    compressDracoMeshesdefaults.compressMeshes = true;
+
+    /*compressDracoMeshesdefaults['compression-level'] = 7;
+    compressDracoMeshesdefaults['quantize-position-bits'] = 14;
+    compressDracoMeshesdefaults['quantize-normal-bits'] = 10;
+    compressDracoMeshesdefaults['quantize-texcoord-bits'] = 12;
+    compressDracoMeshesdefaults['quantizeColorBits'] = 8;
+    compressDracoMeshesdefaults['quantize-generic-bits'] = 12;*/
+
+    var gltfOptions = {
+        resourceDirectory : rootDirectory
+    };
+    if(compressDracoMeshes){
+        gltfOptions.dracoOptions = compressDracoMeshesdefaults;
+    }
+    return gltfToGlb(gltf, gltfOptions)
+        .then(function(results) {
+            return results.glb;
+        });
 }
