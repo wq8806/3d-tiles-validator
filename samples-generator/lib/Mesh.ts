@@ -327,7 +327,7 @@ export class Mesh {
         }
 
         return new Mesh(
-            batchedIndices,
+            batchedIndices11,    //使用调整后的索引数组，否则材质会出现错乱
             batchedPositions,
             batchedNormals,
             batchedUvs,
@@ -353,9 +353,9 @@ export class Mesh {
             mesh.normals.slice(),
             mesh.uvs.slice(),
             mesh.vertexColors.slice(),
-            undefined,
+            mesh.batchIds.slice(),   //batchid的复制
             mesh.material,
-            mesh.views,
+            mesh.views.slice(),    //数组的复制
             mesh.hasUint32indeces
         );
     }
@@ -454,8 +454,6 @@ export class Mesh {
             var normals = getAccessor(gltf, gltf.accessors[primitive.attributes.NORMAL]);
             var uvs = new Array(positions.length / 3 * 2).fill(0);
             var vertexColors = new Array(positions.length / 3 * 4).fill(0);
-
-
 
             //var mesh = meshes[i];
 

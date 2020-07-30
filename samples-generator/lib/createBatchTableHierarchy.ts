@@ -146,8 +146,18 @@ export function createBatchTableHierarchy(options) {
                     new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
                 );
                 //console.log(box);
-                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 200);
+                /**
+                 * Constructs a new point octree.  constructor(min, max, bias = 0.0, maxPoints = 8, maxDepth = 8)
+                 *
+                 * @param {Vector3} [min] - The lower bounds of the tree.
+                 * @param {Vector3} [max] - The upper bounds of the tree.
+                 * @param {Number} [bias=0.0] - An octant boundary bias.
+                 * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
+                 * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
+                 */
+                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 200);  //200 50 20
                 gltfMap.forEach(function(value,key){
+                    //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 });
                 /*for(var [key, value] of gltfMap){
@@ -294,7 +304,7 @@ function modifyOctantWithChildren_MinMax(octant,temObj) {
             }
         }
     }else{
-        debugger
+        // debugger
     }
     return temObj;
 }
@@ -447,6 +457,8 @@ function createB3dmTile(options) {
 
 
     var contentUri = options.b3dmName;
+    if(contentUri.indexOf('1-7-2-7-3') >=0) //2-7-7-7
+        debugger
     var directory = options.directory;
     var tilePath = path.join(directory, contentUri);
 
@@ -517,7 +529,7 @@ function createB3dmTile(options) {
         });*/
     });
 }
-
+// 合并模型为b3dm的测试代码
 function createB3dmTile11(options) {
     var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
     var noParents = defaultValue(options.noParents, false);
@@ -528,15 +540,15 @@ function createB3dmTile11(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("data/sample_wall/name.txt", 'utf-8', function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_Furnishing/name.txt", 'utf-8', function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             //console.log(data);
-            var str_array = data.split(",");
+            var str_array = data.split(",\r\n");
             str_array.forEach(function (value) {
-                urls.push('data/sample_wall/'+value);
+                urls.push('../data/bim/sample_Furnishing/'+value);
             })
             console.log("ssssssssssssss" + urls.length);
 

@@ -237,10 +237,11 @@ function createGltf(options) {
         view = views[i];
         material = view.material;
         var indicesMinMax = getMinMax(indices, 1, view.indexOffset, view.indexCount);
+        //判断顶点索引是否用unit32来记录，只用unit16会造成索引丢失，模型几何形状错乱
         indexAccessors.push({
             bufferView : indexBufferViewIndex,
-            byteOffset : sizeOfUint16 * view.indexOffset,
-            componentType : 5123, // UNSIGNED_SHORT
+            byteOffset : hasUint32indeces ? sizeOfUint32 * view.indexOffset :  sizeOfUint16 * view.indexOffset,
+            componentType : hasUint32indeces ? 5125 : 5123, // UNSIGNED_SHORT 5123 or UNSIGNED_INT 5125
             count : view.indexCount,
             type : 'SCALAR',
             min : indicesMinMax.min,
