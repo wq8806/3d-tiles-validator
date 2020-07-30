@@ -249,7 +249,7 @@ export class Mesh {
 
             for (var j = 0; j < mesh.views.length; ++j) {
                 if(i === meshesLength - 1){
-                    debugger;
+                    // debugger;
                 }
 
                 /*if(!defined(currentView) || !findSameMaterial(currentView,mesh.views)){

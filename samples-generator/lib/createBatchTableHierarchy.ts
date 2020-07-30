@@ -76,7 +76,6 @@ export function createBatchTableHierarchy(options) {
     var directoryPath = "../data/bim/sample_all/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then(function (xmlMap) {
-        debugger
         console.log(xmlMap);
         var rootbounds;
         for (let k of xmlMap.keys()) {
@@ -163,23 +162,7 @@ export function createBatchTableHierarchy(options) {
                 /*for(var [key, value] of gltfMap){
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 }*/
-                /*var countExist = 0;
-                var countLose = 0;
 
-                for(var [key,value] of gltfMap){
-                    var point = new math_ds.Vector3(value.center.z, value.center.x, value.center.y);
-                    if(!octree.root.contains(point, octree.bias)){
-                        console.log(key);
-                        console.log(point);
-                        ++countLose;
-                    }else {
-                        ++countExist;
-                    }
-                }
-                console.log(countExist);
-                console.log(countLose);*/
-                console.log(octree.pointCount);
-                console.log(octree.getDepth());
                 if(octree.getDepth() > 0){
                     octree.root.tile = null;
                 }
@@ -210,15 +193,10 @@ export function createBatchTableHierarchy(options) {
                     }
                     ++i;
                 }
-                console.log(i);
-                console.log(JSON.stringify(octree));
+                /*console.log(i);
+                console.log(JSON.stringify(octree));*/
                 try {
                     var depth = octree.getDepth();
-                    var ocs = octree.findOctantsByLevel(0);  //1
-                    var ocs1 = octree.findOctantsByLevel(1);
-                    var ocsss = octree.findOctantsByLevel(depth-1);  //40
-                    var ocss = octree.findOctantsByLevel(depth);   //64
-                    var ocs3 = octree.findOctantsByLevel(depth+1);   //0
                     for (let j = 1; j < depth; j++) {
                         var octants = octree.findOctantsByLevel(j);
                         for (let k = 0; k < octants.length; k++) {
@@ -268,14 +246,6 @@ export function createBatchTableHierarchy(options) {
             }catch (e) {
                 console.error(e)
             }
-
-
-            /*return Promise.all([
-                saveTilesetJson(tilesetJsonPath, tilesetJson, options.prettyJson),
-                //saveTile(tilePath, b3dm, options.gzip)
-            ]).then(function (data) {
-                console.log(data);
-            });*/
 
         })
 
@@ -421,7 +391,7 @@ function createB3dmTile(options) {
     for (let i = 0; i < urls.length; i++) {
         urls[i] = options.gltfDirectory + urls[i];
     }
-    console.log("ssssssssssssss" + urls.length);
+    // console.log("ssssssssssssss" + urls.length);
 
 
 
@@ -457,8 +427,6 @@ function createB3dmTile(options) {
 
 
     var contentUri = options.b3dmName;
-    if(contentUri.indexOf('1-7-2-7-3') >=0) //2-7-7-7
-        debugger
     var directory = options.directory;
     var tilePath = path.join(directory, contentUri);
 
@@ -485,7 +453,7 @@ function createB3dmTile(options) {
             });
     }).then(function(meshes) {
         var meshesLength = meshes.length;
-        console.log("ssssssss"+ meshesLength);
+        // console.log("ssssssss"+ meshesLength);
         var clonedMeshes = [];
         for (var i = 0; i < buildingsLength; ++i) {
             for (var j = 0; j < meshesLength; ++j) {
@@ -496,7 +464,6 @@ function createB3dmTile(options) {
             }
         }
         var batchedMesh = Mesh.batch(clonedMeshes);
-        //var batchedMesh = clonedMeshes[0];
         try {
             return createGltf({
                 mesh : batchedMesh,
@@ -520,13 +487,6 @@ function createB3dmTile(options) {
             name : contentUri
         });
         return deferred.promise;
-        /*return Promise.all([
-            //saveTilesetJson(tilesetJsonPath, tilesetJson, options.prettyJson),
-            saveTile(tilePath, b3dm, options.gzip)
-        ]).then(function () {
-            deferred.resolve();
-            return deferred.promise;
-        });*/
     });
 }
 // 合并模型为b3dm的测试代码
