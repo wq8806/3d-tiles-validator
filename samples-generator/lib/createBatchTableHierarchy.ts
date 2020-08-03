@@ -396,6 +396,7 @@ function createB3dmTile(options) {
 
 
     var instances = createInstances(noParents, multipleParents,urls.length,urls);
+    //创建batchtableJson
     var batchTableJson = createBatchTableJson(instances, options);
 
     var batchTableBinary;
