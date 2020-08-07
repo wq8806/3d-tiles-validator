@@ -110,8 +110,7 @@ function computeAABB(minXYZStr,maxXYZStr) {
     center.y = (minXYZ[2] + maxXYZ[2]) / 2;
     center.z = 0 - (minXYZ[1] + maxXYZ[1]) / 2;
     // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
-
-
+    
     var dimensions = {};
     dimensions.x = maxXYZ[0] - minXYZ[0];
     dimensions.y = maxXYZ[2] - minXYZ[2];
@@ -125,5 +124,3 @@ function computeAABB(minXYZStr,maxXYZStr) {
     bounds.maxXYZ = [center.x + dimensions.x / 2 ,center.y + dimensions.y/2, center.z + dimensions.z/2];
     return bounds;
 }
-
-

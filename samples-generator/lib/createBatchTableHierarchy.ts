@@ -92,9 +92,10 @@ export function createBatchTableHierarchy(options) {
                 break;
             }
         }
+        /* 测试代码，IfcBuilding的包围盒
         var buildingboundsStr = "{\"center\":{\"x\":23.912799999999997,\"y\":5.6331,\"z\":-11.093300000000001},\"dimensions\":{\"x\":83.9766,\"y\":13.704600000000001,\"z\":84.7206},\"minXYZ\":[-18.075500000000005,-1.2192000000000007,-53.4536],\"maxXYZ\":[65.9011,12.4854,31.267000000000003]}";
         buildingbounds = JSON.parse(buildingboundsStr);
-        console.log(buildingbounds);
+        console.log(buildingbounds);*/
 
         readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
             //es6 strict 模式下无效
@@ -111,9 +112,7 @@ export function createBatchTableHierarchy(options) {
                 })
             });
             //console.log(gltfMap);
-            var contentUri = 'tile.b3dm';
             var directory = options.directory;
-            // var tilePath = path.join(directory, contentUri);
             var tilesetJsonPath = path.join(directory, 'tileset.json');
             var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";
             rootbounds = JSON.parse(rootboundsStr);
