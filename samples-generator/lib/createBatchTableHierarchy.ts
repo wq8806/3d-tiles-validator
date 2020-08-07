@@ -35,7 +35,7 @@ var getBufferPadded = require('./getBufferPadded');
 var saveBinary = require('./saveBinary');
 var saveJson = require('./saveJson');
 // add own dependency
-var readXml = require('./readXml');
+import { readXml,Bounds} from "./readXml";
 var readGltfNames = require('./readGltfNames');
 var math_ds = require('math-ds');
 var PointOctree = require('sparse-octree');
@@ -74,31 +74,35 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/sample_all/";
+    var directoryPath = "../data/bim/openhouse/";
     options.gltfDirectory = directoryPath;
-    readXml({directoryPath:directoryPath}).then(function (xmlMap) {
+    readXml({directoryPath:directoryPath}).then(function (xmlMap:Map<String,Bounds>) {
         console.log(xmlMap);
         var rootbounds;
-        for (let k of xmlMap.keys()) {
+        for (let k of xmlMap.keys()) {  //es6中的用法，tsconfig.json中配置"target": "es6" 非"es5"
             if(k.indexOf('IfcProject') >= 0){
                 rootbounds = xmlMap.get(k);
                 break;
             }
         }
-        var buildingbounds;
+        /*var buildingbounds;
         for (let k of xmlMap.keys()) {
             if(k.indexOf('IfcBuilding') >= 0){
                 buildingbounds = xmlMap.get(k);
                 break;
             }
-        }
-        /* 测试代码，IfcBuilding的包围盒
+        }*/
+
+        /* 测试代码
+        var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";  //IfcProject(IfcSite)的Bounds
+        rootbounds = JSON.parse(rootboundsStr);
+        //IfcBuilding的包围盒
         var buildingboundsStr = "{\"center\":{\"x\":23.912799999999997,\"y\":5.6331,\"z\":-11.093300000000001},\"dimensions\":{\"x\":83.9766,\"y\":13.704600000000001,\"z\":84.7206},\"minXYZ\":[-18.075500000000005,-1.2192000000000007,-53.4536],\"maxXYZ\":[65.9011,12.4854,31.267000000000003]}";
         buildingbounds = JSON.parse(buildingboundsStr);
         console.log(buildingbounds);*/
 
         readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
-            //es6 strict 模式下无效
+            //es6 模式下使用
             /*for(var [key, value] of gltfMap){
                 gltfMap.set(key,xmlMap.get(key));
             }*/
@@ -114,8 +118,6 @@ export function createBatchTableHierarchy(options) {
             //console.log(gltfMap);
             var directory = options.directory;
             var tilesetJsonPath = path.join(directory, 'tileset.json');
-            var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";
-            rootbounds = JSON.parse(rootboundsStr);
 
             var box = [
                 rootbounds.center.z , rootbounds.center.x , rootbounds.center.y,
@@ -160,7 +162,7 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
                  */
-                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 200);  //200 50 20
+                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 2);  //200 50 20
                 gltfMap.forEach(function(value,key){
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
@@ -219,9 +221,7 @@ export function createBatchTableHierarchy(options) {
                         }
                     }
                     // console.log(JSON.stringify(octree.root.children));
-                    octree.root.children.forEach(function (value,index,arr) {
-                        // modifyOctantMinAndMax(value);
-                    })
+
                     var testss = getRootJSONFromOctree(octree.root);
                     deleteNull(testss);
 
