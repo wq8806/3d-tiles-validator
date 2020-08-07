@@ -80,7 +80,7 @@ function traverseJson(obj,map) {
                 var minXYZStr = obj[key]['attr']['@_minXYZ'];
                 var maxSYXStr = obj[key]['attr']['@_maxXYZ'];
 
-                map.set(obj[key]['attr']['@_id'] + "--" + key +".gltf",computeAABB(minXYZStr,maxSYXStr));
+                map.set(obj[key]['attr']['@_id'] + "--" + key +".glb",computeAABB(minXYZStr,maxSYXStr));
                 var objA = obj[key];
                 traverseJson(objA,map);
             }else if(obj[key] instanceof Array){

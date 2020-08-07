@@ -17,6 +17,7 @@ var Cesium = require('cesium');
 
 const gltfPipeline = require('gltf-pipeline');
 var gltfToGlb = gltfPipeline.gltfToGlb;
+const glbToGltf = gltfPipeline.glbToGltf;
 var fsExtra = require('fs-extra');
 var path = require('path');
 var gltfConversionOptions = { resourceDirectory: path.join(__dirname, '../') };
@@ -101,7 +102,13 @@ export function createBatchTableHierarchy(options) {
                 gltfMap.set(key,xmlMap.get(key));
             }*/
             gltfMap.forEach(function(value,key){
-                gltfMap.set(key,xmlMap.get(key));
+                xmlMap.forEach(function (value1,key1) {
+                    const gltfMapkey = key.substring(0,key.length - 4);
+                    const xmlMapkey = key1.substring(0,key1.length -4);
+                    if(gltfMapkey.includes(xmlMapkey)){
+                        gltfMap.set(key,xmlMap.get(key1));
+                    }
+                })
             });
             //console.log(gltfMap);
             var contentUri = 'tile.b3dm';
@@ -441,7 +448,19 @@ function createB3dmTile(options) {
 
     return Promise.map(urls, function(url) {
         //console.log(url);
-        return fsExtra.readJson(url)
+        const glb = fsExtra.readFileSync(url);
+        return glbToGltf(glb).then(function(result) {
+            try { //{gltf:gltf,separateResources:{}}
+                return Mesh.fromGltf(result.gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
+            }catch (e) {
+                console.error(e);
+                console.log(url);
+            }
+        }).catch(function (error) {
+            console.error(error);
+        });
+
+        /*return fsExtra.readJson(url)     //读取gltf文件
             .then(function(gltf) {
                 try {
                     return Mesh.fromGltf(gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
@@ -451,7 +470,7 @@ function createB3dmTile(options) {
                 }
             }).catch(function (reason) {
                 console.error(reason);
-            });
+            });*/
     }).then(function(meshes) {
         var meshesLength = meshes.length;
         // console.log("ssssssss"+ meshesLength);
