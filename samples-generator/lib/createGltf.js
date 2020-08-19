@@ -110,9 +110,9 @@ function createGltf(options) {
     if (useVertexColors) {
         vertexColorsMinMax = getMinMax(vertexColors, 4);
         var vertexColorsLength = vertexColors.length;
-        vertexColorsBuffer = Buffer.alloc(vertexColorsLength, sizeOfUint8);
+        vertexColorsBuffer = Buffer.alloc(vertexColorsLength * sizeOfFloat32);
         for (i = 0; i < vertexColorsLength; ++i) {
-            vertexColorsBuffer.writeUInt8(vertexColors[i], i);
+            vertexColorsBuffer.writeFloatLE(vertexColors[i], i * sizeOfFloat32);
         }
     }
 
@@ -360,12 +360,12 @@ function createGltf(options) {
         vertexAccessors.push({
             bufferView : vertexColorsBufferViewIndex,
             byteOffset : 0,
-            componentType : 5121, // UNSIGNED_BYTE
+            componentType : 5126, // UNSIGNED_BYTE
             count : vertexCount,
             type : 'VEC4',
-            min : vertexColorsMinMax.min,
+            /*min : vertexColorsMinMax.min,
             max : vertexColorsMinMax.max,
-            normalized : true
+            normalized : true*/
         });
     }
 

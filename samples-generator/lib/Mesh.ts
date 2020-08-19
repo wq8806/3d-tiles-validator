@@ -472,10 +472,14 @@ export class Mesh {
             const vertexCount = positions.length / 3;
             if(useVertexColor){
                 for (let i = 0; i < vertexCount; ++i) {
-                    vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
+                    /*vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
                     vertexColors[i * 4 + 1] = Math.floor(material.baseColor[1] * 255);
                     vertexColors[i * 4 + 2] = Math.floor(material.baseColor[2] * 255);
-                    vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);
+                    vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);*/
+                    vertexColors[i * 4 + 0] = material.baseColor[0];
+                    vertexColors[i * 4 + 1] = material.baseColor[1];
+                    vertexColors[i * 4 + 2] = material.baseColor[2];
+                    vertexColors[i * 4 + 3] = material.baseColor[3];
                 }
             }
 
