@@ -165,6 +165,20 @@ export class Mesh {
     /**
      * Bake materials as vertex colors. Use the default white opaque material.
      */
+    transferMaterialToVertexColors0() {
+        const material = this.material;
+        this.material = whiteOpaqueMaterial;
+        const vertexCount = this.vertexCount;
+        const vertexColors = new Array(vertexCount * 4);
+        this.vertexColors = vertexColors;
+        for (let i = 0; i < vertexCount; ++i) {
+            vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
+            vertexColors[i * 4 + 1] = Math.floor(material.baseColor[1] * 255);
+            vertexColors[i * 4 + 2] = Math.floor(material.baseColor[2] * 255);
+            vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);
+        }
+    }
+
     transferMaterialToVertexColors() {
         const material = this.material;
         this.material = whiteOpaqueMaterial;
@@ -247,7 +261,7 @@ export class Mesh {
                 batchedIndices.push(index);
             }
 
-            for (var j = 0; j < mesh.views.length; ++j) {
+            for (let j = 0; j < mesh.views.length; ++j) {
                 if(i === meshesLength - 1){
                     // debugger;
                 }
@@ -403,7 +417,7 @@ export class Mesh {
      * @param {Object} gltf The glTF.
      * @returns {Mesh} The mesh.
      */
-    static fromGltf(gltf: Gltf): Mesh {
+    static fromGltf(gltf: Gltf, useVertexColor:boolean = false): Mesh {
         /*const gltfPrimitive = gltf.meshes[0].primitives[0];
         const gltfMaterial = gltf.materials[gltfPrimitive.material];
         const material = Material.fromGltf(gltfMaterial);
@@ -455,9 +469,17 @@ export class Mesh {
             var uvs = new Array(positions.length / 3 * 2).fill(0);
             var vertexColors = new Array(positions.length / 3 * 4).fill(0);
 
-            //var mesh = meshes[i];
+            const vertexCount = positions.length / 3;
+            if(useVertexColor){
+                for (let i = 0; i < vertexCount; ++i) {
+                    vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
+                    vertexColors[i * 4 + 1] = Math.floor(material.baseColor[1] * 255);
+                    vertexColors[i * 4 + 2] = Math.floor(material.baseColor[2] * 255);
+                    vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);
+                }
+            }
 
-            var vertexCount = positions.length / 3;
+            // var vertexCount = positions.length / 3;
             var batchIds = new Array(vertexCount).fill(i);
 
             gltfPositions = gltfPositions.concat(positions);
@@ -469,15 +491,17 @@ export class Mesh {
             //var indices = mesh.indices;
             var indicesLength = indices.length;
 
-            if (!defined(currentView) || (currentView.material !== material)) {
-                currentView = new MeshView(
-                    material,
-                    indexOffset,
-                    indicesLength
-                );
-                views.push(currentView);
-            } else {
-                currentView.indexCount += indicesLength;
+            if(!useVertexColor){
+                if (!defined(currentView) || (currentView.material !== material)) {
+                    currentView = new MeshView(
+                        material,
+                        indexOffset,
+                        indicesLength
+                    );
+                    views.push(currentView);
+                } else {
+                    currentView.indexCount += indicesLength;
+                }
             }
 
             for (var j = 0; j < indicesLength; ++j) {
@@ -491,6 +515,14 @@ export class Mesh {
             indexOffset += indicesLength;
         }
 
+        if(useVertexColor){
+            const meshView = new MeshView(
+                whiteOpaqueMaterial,
+                0,
+                gltfIndices.length
+            );
+            views.push(meshView);
+        }
         return new Mesh(
             gltfIndices,
             gltfPositions,
