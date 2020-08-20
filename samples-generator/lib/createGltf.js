@@ -360,7 +360,7 @@ function createGltf(options) {
         vertexAccessors.push({
             bufferView : vertexColorsBufferViewIndex,
             byteOffset : 0,
-            componentType : 5126, // UNSIGNED_BYTE
+            componentType : 5126, // FLOAT   UNSIGNED_BYTE 在draco时会有问题
             count : vertexCount,
             type : 'VEC4',
             /*min : vertexColorsMinMax.min,
@@ -573,12 +573,12 @@ function createGltf(options) {
     // return gltf;
     var compressDracoMeshesdefaults = {
         compressionLevel: 7,
-        quantizePositionBits: 14,
-        quantizeNormalBits: 10,
-        quantizeTexcoordBits: 12,
+        quantizePositionBits: 11,
+        quantizeNormalBits: 8,
+        quantizeTexcoordBits: 10,
         quantizeColorBits: 8,
-        //quantizeSkinBits: 12,
-        quantizeGenericBits: 12,
+        quantizeSkinBits: 8,
+        quantizeGenericBits: 8,
         uncompressedFallback: false,
         unifiedQuantization: false
     };
