@@ -74,7 +74,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/center/";
+    var directoryPath = "../data/bim/openhouse/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then(function (xmlMap:Map<String,Bounds>) {
         // console.log(xmlMap);
@@ -139,6 +139,27 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
+            if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
+                const gltfNameArr = [];
+                gltfMap.forEach((value,key) =>{
+                    gltfNameArr.push(key);
+                })
+
+                options.nameArray = gltfNameArr;
+                options.b3dmName = 'tile.b3dm';
+                try {
+                    tilesetJson.root['content'] = {uri: options.b3dmName};
+                    return createB3dmTile(options).then(value => {
+                        const tilePath = path.join(options.directory , value.name);
+                        return Promise.all([
+                            saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
+                            saveBinary(tilePath, value.b3dm, options.gzip)
+                        ]);
+                    });
+                }catch (e) {
+                    console.error(e);
+                }
+            }
 
             try {
                 /*var box1 = new math_ds.Box3(
@@ -162,7 +183,9 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
                  */
-                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 1500);  //200 50 20
+                const maxPoints = Math.round(gltfMap.size / 8);
+
+                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
                 gltfMap.forEach(function(value,key){
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});

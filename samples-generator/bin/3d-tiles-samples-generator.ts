@@ -1389,6 +1389,7 @@ function createHierarchy() {
         prettyJson: prettyJson,
         use3dTilesNext: argv['3d-tiles-next'],
         useGlb: argv.glb,
+        useVertexColors:true, //是否写入顶点颜色
         compressDracoMeshes: true  //是否使用draco压缩
     });
 }

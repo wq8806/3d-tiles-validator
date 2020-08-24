@@ -281,7 +281,7 @@ function createGltf(options) {
             }*/
         }
 
-        var doubleSided = false;//transparent;
+        var doubleSided = false;//(material.alphaMode === 'BLEND') ? true : false;//transparent;
         // var alphaMode = (transparent) ? 'BLEND' : 'OPAQUE';
         var alphaMode = material.alphaMode;
 
