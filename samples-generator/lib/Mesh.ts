@@ -16,7 +16,8 @@ const sizeOfUint16 = 2;     //sizeOf datatype in bytes
 const sizeOfUint32 = 4;
 const sizeOfFloat32 = 4;
 
-const whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
+const whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0],'OPAQUE');
+const whiteBlendMaterial = new Material([1.0,1.0,1.0,1.0],'BLEND');
 
 export class Mesh {
     private readonly scratchCartesian = new Cartesian3();
@@ -481,6 +482,11 @@ export class Mesh {
                     vertexColors[i * 4 + 2] = material.baseColor[2];
                     vertexColors[i * 4 + 3] = material.baseColor[3];
                 }
+                if(material.baseColor[3] < 1.0){
+                    material = whiteBlendMaterial;
+                }else {
+                    material = whiteOpaqueMaterial;
+                }
             }
 
             // var vertexCount = positions.length / 3;
@@ -495,17 +501,15 @@ export class Mesh {
             //var indices = mesh.indices;
             var indicesLength = indices.length;
 
-            if(!useVertexColor){
-                if (!defined(currentView) || (currentView.material !== material)) {
-                    currentView = new MeshView(
-                        material,
-                        indexOffset,
-                        indicesLength
-                    );
-                    views.push(currentView);
-                } else {
-                    currentView.indexCount += indicesLength;
-                }
+            if (!defined(currentView) || (currentView.material !== material)) {
+                currentView = new MeshView(
+                    material,
+                    indexOffset,
+                    indicesLength
+                );
+                views.push(currentView);
+            } else {
+                currentView.indexCount += indicesLength;
             }
 
             for (var j = 0; j < indicesLength; ++j) {
@@ -519,14 +523,6 @@ export class Mesh {
             indexOffset += indicesLength;
         }
 
-        if(useVertexColor){
-            const meshView = new MeshView(
-                whiteOpaqueMaterial,
-                0,
-                gltfIndices.length
-            );
-            views.push(meshView);
-        }
         return new Mesh(
             gltfIndices,
             gltfPositions,
@@ -578,7 +574,8 @@ function getSameMaterial(views,view) {
         if(views[i].material.baseColor[0] === view.material.baseColor[0] &&
             views[i].material.baseColor[1] === view.material.baseColor[1] &&
             views[i].material.baseColor[2] === view.material.baseColor[2] &&
-            views[i].material.baseColor[3] === view.material.baseColor[3]){
+            views[i].material.baseColor[3] === view.material.baseColor[3] &&
+            views[i].material.alphaMode === view.material.alphaMode){
             return views[i];
         }
     }

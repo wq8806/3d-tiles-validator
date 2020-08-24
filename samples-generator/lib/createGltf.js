@@ -275,10 +275,15 @@ function createGltf(options) {
             });
         } else {
             transparent = baseColor[3] < 1.0;
+            //不要修改PromiseList返回的resolve的value，否则会使value属性混乱
+            /*if(baseColor[3] < 1.0){
+                baseColorFactor[3] = 1.0;
+            }*/
         }
 
-        var doubleSided = transparent;
-        var alphaMode = (transparent) ? 'BLEND' : 'OPAQUE';
+        var doubleSided = false;//transparent;
+        // var alphaMode = (transparent) ? 'BLEND' : 'OPAQUE';
+        var alphaMode = material.alphaMode;
 
         material = {
             pbrMetallicRoughness : {

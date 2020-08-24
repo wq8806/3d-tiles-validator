@@ -74,10 +74,10 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/openhouse/";
+    var directoryPath = "../data/bim/center/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then(function (xmlMap:Map<String,Bounds>) {
-        console.log(xmlMap);
+        // console.log(xmlMap);
         var rootbounds;
         for (let k of xmlMap.keys()) {  //es6中的用法，tsconfig.json中配置"target": "es6" 非"es5"
             if(k.indexOf('IfcProject') >= 0){
@@ -162,15 +162,18 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
                  */
-                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 2);  //200 50 20
+                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, 1500);  //200 50 20
                 gltfMap.forEach(function(value,key){
-                    //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);
+                    //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 });
                 /*for(var [key, value] of gltfMap){
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 }*/
 
+                if(octree.pointCount !== gltfMap.size){
+                    console.error("模型缺失！");
+                }
                 if(octree.getDepth() > 0){
                     octree.root.tile = null;
                 }
@@ -179,7 +182,7 @@ export function createBatchTableHierarchy(options) {
                 let i = 0;
                 // var children = [];
                 while(!iterator.next().done) {
-                    console.log(iterator.indices);
+                    // console.log(iterator.indices);
                     var indicesArr = iterator.indices;
                     var currentOctant = iterator.result.value;
                     // currentOctant.tile = null;
@@ -225,10 +228,10 @@ export function createBatchTableHierarchy(options) {
                     var testss = getRootJSONFromOctree(octree.root);
                     deleteNull(testss);
 
-                    console.log(JSON.stringify(testss));
+                    // console.log(JSON.stringify(testss));
                     var children = JSON.parse(JSON.stringify(testss.children));
                     tilesetJson.root.children = children;
-                    console.log(JSON.stringify(tilesetJson));
+                    // console.log(JSON.stringify(tilesetJson));
                 }catch (e) {
                     console.error(e);
                 }
@@ -381,11 +384,12 @@ function createB3DMTask(options,children,promiseArray) {
 }
 
 function createB3dmTile(options) {
-    var deferred = Cesium.when.defer();
+    // var deferred = Cesium.when.defer();
     var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
     var noParents = defaultValue(options.noParents, false);
     var multipleParents = defaultValue(options.multipleParents, false);
     var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    const useVertexColors:boolean = defaultValue(options.useVertexColors,false);
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
 
@@ -398,8 +402,6 @@ function createB3dmTile(options) {
         urls[i] = options.gltfDirectory + urls[i];
     }
     // console.log("ssssssssssssss" + urls.length);
-
-
 
     var instances = createInstances(noParents, multipleParents,urls.length,urls);
     //创建batchtableJson
@@ -450,7 +452,7 @@ function createB3dmTile(options) {
         const glb = fsExtra.readFileSync(url);
         return glbToGltf(glb).then(function(result) {
             try { //{gltf:gltf,separateResources:{}}
-                return Mesh.fromGltf(result.gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
+                return Mesh.fromGltf(result.gltf,useVertexColors);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
             }catch (e) {
                 console.error(e);
                 console.log(url);
@@ -470,7 +472,7 @@ function createB3dmTile(options) {
             }).catch(function (reason) {
                 console.error(reason);
             });*/
-    }).then(function(meshes) {
+    }).then(function(meshes) { // promise队列返回resolve的value值不要修改，否则会value混乱
         var meshesLength = meshes.length;
         // console.log("ssssssss"+ meshesLength);
         var clonedMeshes = [];
@@ -494,18 +496,22 @@ function createB3dmTile(options) {
         }
 
     }).then(function(glb) {
-        console.log(glb);
+        // console.log(glb);
         var b3dm = createB3dm({
             glb : glb,
             featureTableJson : featureTableJson,
             batchTableJson : batchTableJson,
             batchTableBinary : batchTableBinary
         });
-        deferred.resolve({
+        return Promise.resolve({
             b3dm : b3dm,
             name : contentUri
         });
-        return deferred.promise;
+        /*deferred.resolve({
+            b3dm : b3dm,
+            name : contentUri
+        });
+        return deferred.promise;*/
     });
 }
 // 合并模型为b3dm的测试代码
@@ -519,19 +525,15 @@ function createB3dmTile11(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_Furnishing/name.txt", 'utf-8', function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_all/name.txt", 'utf-8', function (err,data) {
         if(err){
             console.error(err);
         }
         else{
-            //console.log(data);
-            var str_array = data.split(",\r\n");
+            var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_Furnishing/'+value);
+                urls.push('../data/bim/sample_all/'+value);
             })
-            console.log("ssssssssssssss" + urls.length);
-
-
 
             var instances = createInstances(noParents, multipleParents,urls.length,urls);
             var batchTableJson = createBatchTableJson(instances, options);
@@ -610,17 +612,25 @@ function createB3dmTile11(options) {
 
             return Promise.map(urls, function(url) {
                 //console.log(url);
-                return fsExtra.readJson(url)
+                const glb = fsExtra.readFileSync(url);
+                return glbToGltf(glb).then(function(result) {
+                    try { //{gltf:gltf,separateResources:{}}
+                        /*if(url.indexOf("3k78sW2oH8swtbeSMzotXs") >= 0)
+                            debugger*/
+                        return Mesh.fromGltf(result.gltf,false);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
+                    }catch (e) {
+                        console.error(e);
+                        console.log(url);
+                    }
+                }).catch(function (error) {
+                    console.error(error);
+                });
+                /*return fsExtra.readJson(url)
                     .then(function(gltf) {
-                        try {
-                            return Mesh.fromGltf(gltf);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
-                        }catch (e) {
-                            console.error(e);
-                            console.log(url);
-                        }
+                        return Mesh.fromGltf(gltf,true);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
                     }).catch(function (reason) {
                         console.error(reason);
-                    });
+                    });*/
             }).then(function(meshes) {
                 var meshesLength = meshes.length;
                 console.log("ssssssss"+ meshesLength);
@@ -638,7 +648,7 @@ function createB3dmTile11(options) {
                 try {
                     return createGltf({
                         mesh : batchedMesh,
-                        compressDracoMeshes : compressDracoMeshes,
+                        compressDracoMeshes : false,
                         //useBatchIds : false
                     });
                 }catch (e) {
@@ -647,6 +657,7 @@ function createB3dmTile11(options) {
 
             }).then(function(glb) {
                 console.log(glb);
+                //return saveBinary(tilePath, glb, options.gzip)
                 var b3dm = createB3dm({
                     glb : glb,
                     featureTableJson : featureTableJson,
@@ -1141,10 +1152,10 @@ function addHierarchyToGltf(hierarchy: any, gltf: Gltf, binary: Buffer) {
 
 function createInstances(noParents, multipleParents,count,urls) {
     var propertyArray = [];
-    console.log(urls);
+    // console.log(urls);
     urls.forEach(function (value,index,array) {
         var separator = value.lastIndexOf("/");
-        var extension = value.indexOf(".gltf");
+        var extension = value.indexOf(".glb");
         value = value.substring(separator + 1,extension);    //0H1nVTTAv6LhM6_nm3wfNy--IfcDoor
         value = value.split("--");
         propertyArray.push(value);

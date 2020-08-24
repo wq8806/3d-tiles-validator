@@ -9,11 +9,13 @@
 
 export class Material {
     baseColor: number[];
+    alphaMode: string;
 
     // TODO: Original code combined rgbas with jpg uris, should refactor
     //       this too.
-    constructor(baseColor: number[] = [0.5, 0.5, 0.5, 1.0]) {
+    constructor(baseColor: number[] = [0.5, 0.5, 0.5, 1.0],alphaMode: string='OPAQUE') {
         this.baseColor = baseColor;
+        this.alphaMode = alphaMode;
     }
 
     /**
@@ -24,7 +26,7 @@ export class Material {
      */
 
     static fromGltf(material: any): Material {
-        return new Material(material.pbrMetallicRoughness.baseColorFactor);
+        return new Material(material.pbrMetallicRoughness.baseColorFactor,material.alphaMode);
     }
 }
 
