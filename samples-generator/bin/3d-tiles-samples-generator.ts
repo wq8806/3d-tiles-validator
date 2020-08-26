@@ -1389,6 +1389,7 @@ function createHierarchy() {
         prettyJson: prettyJson,
         use3dTilesNext: argv['3d-tiles-next'],
         useGlb: argv.glb,
+        batchTableBinary:false, //二进制batchtable,针对属性中较长的数字数组，使用
         useVertexColors:true, //是否写入顶点颜色
         compressDracoMeshes: true  //是否使用draco压缩
     });

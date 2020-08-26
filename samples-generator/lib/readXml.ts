@@ -12,7 +12,7 @@ export function readXml(options) {
                 console.error(err);
             }else {
                 var options = {
-                    attributeNamePrefix : "@_",
+                    attributeNamePrefix : "", //去掉前缀@_
                     attrNodeName: "attr", //default is 'false'
                     textNodeName : "#text",
                     ignoreNonTextNodeAttr : false,
@@ -36,7 +36,10 @@ export function readXml(options) {
 
                     var jsonObj = fastXmlParser.parse(result,options);
                     var myMap = traverseJson(jsonObj.ifc.decomposition,undefined);
-                    derrered.resolve(myMap);
+                    derrered.resolve({
+                        xmlJson:jsonObj,
+                        boundingInfoMap:myMap,
+                    });
                     //console.log(myMap);
                     // console.log("ssssssssss"+ myMap.size);
                     // console.log('xml解析成json:'+JSON.stringify(jsonObj));
@@ -56,11 +59,11 @@ function traverseJson(obj,map) {
     for( var key in obj){
         if(key.indexOf('Ifc') >= 0 && obj[key] !== undefined){
 
-            if(obj[key].hasOwnProperty("attr") && obj[key]['attr'].hasOwnProperty("@_minXYZ")){
-                var minXYZStr = obj[key]['attr']['@_minXYZ'];
-                var maxSYXStr = obj[key]['attr']['@_maxXYZ'];
+            if(obj[key].hasOwnProperty("attr") && obj[key]['attr'].hasOwnProperty("minXYZ")){
+                var minXYZStr = obj[key]['attr']['minXYZ'];
+                var maxSYXStr = obj[key]['attr']['maxXYZ'];
 
-                map.set(obj[key]['attr']['@_id'] + "--" + key +".glb",computeAABB(minXYZStr,maxSYXStr));
+                map.set(obj[key]['attr']['id'] + "--" + key +".glb",computeAABB(minXYZStr,maxSYXStr));
                 var objA = obj[key];
                 traverseJson(objA,map);
             }else if(obj[key] instanceof Array){

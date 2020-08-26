@@ -39,6 +39,7 @@ import { readXml,Bounds} from "./readXml";
 var readGltfNames = require('./readGltfNames');
 var math_ds = require('math-ds');
 var PointOctree = require('sparse-octree');
+import {JSONPath} from 'jsonpath-plus';
 
 var sizeOfFloat = 4;
 var sizeOfUint16 = 2;
@@ -62,7 +63,7 @@ var whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
  * @param {Boolean} [options.useGlb=false] Whether to use glb with 3dTilesNexxt
  * @returns {Promise} A promise that resolves when the tileset is saved.
  */
-
+let buildStoreyMap;
 export function createBatchTableHierarchy(options) {
     var use3dTilesNext = defaultValue(options.use3dTilesNext, false);
     var useGlb = defaultValue(options.useGlb, false);
@@ -74,10 +75,15 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/openhouse/";
+    var directoryPath = "../data/bim/sample_all/";
     options.gltfDirectory = directoryPath;
-    readXml({directoryPath:directoryPath}).then(function (xmlMap:Map<String,Bounds>) {
+    readXml({directoryPath:directoryPath}).then((value:any) =>  {
+        const xmlJson = value.xmlJson;
+        buildStoreyMap = createStoreyMap(xmlJson);
+        options.xmlJson = xmlJson;
+        const xmlMap:Map<String,Bounds> = value.boundingInfoMap;
         // console.log(xmlMap);
+        options.xmlMap = xmlMap;
         var rootbounds;
         for (let k of xmlMap.keys()) {  //es6中的用法，tsconfig.json中配置"target": "es6" 非"es5"
             if(k.indexOf('IfcProject') >= 0){
@@ -151,6 +157,7 @@ export function createBatchTableHierarchy(options) {
                     tilesetJson.root['content'] = {uri: options.b3dmName};
                     return createB3dmTile(options).then(value => {
                         const tilePath = path.join(options.directory , value.name);
+                        console.log("done");
                         return Promise.all([
                             saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
                             saveBinary(tilePath, value.b3dm, options.gzip)
@@ -426,7 +433,7 @@ function createB3dmTile(options) {
     }
     // console.log("ssssssssssssss" + urls.length);
 
-    var instances = createInstances(noParents, multipleParents,urls.length,urls);
+    var instances = createInstances(noParents, multipleParents,urls.length,urls,options.xmlJson);
     //创建batchtableJson
     var batchTableJson = createBatchTableJson(instances, options);
 
@@ -558,7 +565,7 @@ function createB3dmTile11(options) {
                 urls.push('../data/bim/sample_all/'+value);
             })
 
-            var instances = createInstances(noParents, multipleParents,urls.length,urls);
+            var instances = createInstances11(noParents, multipleParents,urls.length,urls);
             var batchTableJson = createBatchTableJson(instances, options);
 
             var batchTableBinary;
@@ -1173,7 +1180,53 @@ function addHierarchyToGltf(hierarchy: any, gltf: Gltf, binary: Buffer) {
     );
 }
 
-function createInstances(noParents, multipleParents,count,urls) {
+function createStoreyMap(xmlJson) {
+    const storeyMap = new Map();
+    const result = JSONPath({path: '$..IfcBuildingStorey', json:xmlJson.ifc.decomposition.IfcProject});
+    const buildStoreyArr = result[0];
+    for (let i = 0; i < buildStoreyArr.length; i++) {
+        let storeyName = '';
+        if(buildStoreyArr[i].attr.Name){
+            storeyName = buildStoreyArr[i].attr.Name;
+        }
+        const key = 'IfcBuildingStorey--' + buildStoreyArr[i].attr.id + '--' + storeyName;
+        const ids = JSONPath({path: "$..attr[?(@property === 'id')]",
+            json:buildStoreyArr[i]});
+        /*const storeyChilds = JSONPath({path: '$..*',
+            json:result[i]})*/
+        storeyMap.set(key,ids);
+    }
+    return storeyMap;
+}
+function findStoreyByGuid_storyMap(guid,storyMap) {
+
+}
+function findStoreyByGuid(guid,xmlJson) {
+    // const guid = '2djUpNQFD2dRiVUyFA_bce';
+    const result = JSONPath({path: '$..IfcBuildingStorey', json:xmlJson.ifc.decomposition.IfcProject});
+    const buildStoreyArr = result[0];
+    // const arr2 = JSONPath({path: '$.*~', json:xmlJson.ifc.decomposition.IfcProject});
+    // const arr3 = JSONPath({path:'$..IfcBuildingStorey',json:xmlJson.ifc.decomposition.IfcProject});
+    // const arr4 = JSONPath({path:'$..*',json:xmlJson.ifc.decomposition.IfcProject});
+    // const arr1 = JSONPath({path: '$..*[?(@property === \'@_id\' && @ === \'2djUpNQFD2dRiVUyFA_bce\')]^', json:xmlJson.ifc.decomposition.IfcProject});
+
+    for (let i = 0; i < buildStoreyArr.length; i++) {
+        /* const storeyChilds = JSONPath({path: '$..*',
+             json:result[i]})
+         const storeyChilds1 = JSONPath({path: '$..attr',
+             json:result[i]})*/
+        const storeyChilds2 = JSONPath({
+            path: "$..*[?(@.id === '"+guid+"')]",
+            json:buildStoreyArr[i]
+        })
+        if(storeyChilds2.length > 0){
+            return buildStoreyArr[i];
+        }
+    }
+    return null;
+}
+
+function createInstances(noParents, multipleParents,count,urls,xmlJson) {
     var propertyArray = [];
     // console.log(urls);
     urls.forEach(function (value,index,array) {
@@ -1184,18 +1237,41 @@ function createInstances(noParents, multipleParents,count,urls) {
         propertyArray.push(value);
     })
     var instanceArray = [];
+
+    let className = '';
     for (var i = 0; i < count; i++) {
+        if(propertyArray[i][1] === 'IfcSite'){
+            className = 'IfcSite--' +  propertyArray[i][0];
+        }else {
+            for (var [key, value] of buildStoreyMap) {
+                const index = value.indexOf(propertyArray[i][0]);
+                if(index >= 0){
+                    className = key;
+                    value.splice(index,1);
+                    break;
+                }
+            }
+            /*const buildStorey = findStoreyByGuid(propertyArray[i][0],xmlJson); //耗时很长，sample转换7.5h
+            if(!buildStorey || !buildStorey.attr){
+                console.log(propertyArray[i][0]);
+                className = 'undefind';
+            }else {
+                const storeyName = buildStorey.attr.Name ? buildStorey.attr.Name : "";
+                className = 'IfcBuildingStorey--' + buildStorey.attr.id + '--' + storeyName;
+            }*/
+        }
         var instance = {
             instance : {
-                className : propertyArray[i].join("--"),
+                className : className,//propertyArray[i].join("--"),
                 properties : {
-                    guid : propertyArray[i][0]
+                    guid : propertyArray[i][0],
+                    ifc_type : propertyArray[i][1]
                 }
             },
-            properties : {
+            /*properties : {
                 guid : propertyArray[i][0],
                 ifc_type : propertyArray[i][1]
-            }
+            }*/
         };
         instanceArray.push(instance);
     }
@@ -1212,27 +1288,29 @@ function createInstances(noParents, multipleParents,count,urls) {
 }
 
 function createInstances11(noParents, multipleParents,count,urls) {
-    console.log(urls);
+    var propertyArray = [];
+    // console.log(urls);
     urls.forEach(function (value,index,array) {
         var separator = value.lastIndexOf("/");
-        var extension = value.indexOf(".gltf");
+        var extension = value.indexOf(".glb");
         value = value.substring(separator + 1,extension);    //0H1nVTTAv6LhM6_nm3wfNy--IfcDoor
+        value = value.split("--");
+        propertyArray.push(value);
     })
     var instanceArray = [];
     for (var i = 0; i < count; i++) {
         var instance = {
             instance : {
-                className : 'wall',
+                className : propertyArray[i].join("--"),
                 properties : {
-                    wall_name : 'wall0',
-                    wall_paint : 'pink',
-                    wall_windows : 1
+                    guid : propertyArray[i][0],
+                    ifc_type : propertyArray[i][1]
                 }
             },
-            properties : {
-                guid : 10.0,
-                ifc_type : 20.0
-            }
+            /*properties : {   //在extension外层生成属性
+                guid : propertyArray[i][0],
+                ifc_type : propertyArray[i][1]
+            }*/
         };
         instanceArray.push(instance);
     }
