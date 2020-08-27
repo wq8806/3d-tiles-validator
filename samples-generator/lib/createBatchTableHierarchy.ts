@@ -75,7 +75,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/sample_all/";
+    var directoryPath = "../data/bim/center/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         const xmlJson = value.xmlJson;
@@ -145,6 +145,8 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
+            /*return createB3dmTile11(options);
+            return ;*/
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
                 gltfMap.forEach((value,key) =>{
@@ -214,7 +216,7 @@ export function createBatchTableHierarchy(options) {
                 while(!iterator.next().done) {
                     // console.log(iterator.indices);
                     var indicesArr = iterator.indices;
-                    var currentOctant = iterator.result.value;
+                    let currentOctant = iterator.result.value;
                     // currentOctant.tile = null;
                     if(currentOctant.children === null){
                         if(currentOctant.data !== null){
@@ -241,7 +243,7 @@ export function createBatchTableHierarchy(options) {
                     for (let j = 1; j < depth; j++) {
                         var octants = octree.findOctantsByLevel(j);
                         for (let k = 0; k < octants.length; k++) {
-                            var currentOctant = octants[k];
+                            let currentOctant = octants[k];
                             var minAndmaxobj = modifyOctantWithChildren_MinMax(currentOctant,undefined);
                             if(currentOctant.children !== null){   //包含子节点的修改
                                 currentOctant.min.x = Math.min.apply(null, minAndmaxobj.minX);
