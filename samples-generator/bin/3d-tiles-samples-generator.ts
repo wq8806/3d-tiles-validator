@@ -154,8 +154,9 @@ var promises = [
     createBatchedWithContentDataUri(),
     createBatchedAnimated(),*/
 
+    createBatchedTextured(),
     // Hierarchy
-    createHierarchy(),
+    // createHierarchy(),
     /*createHierarchyLegacy(),
     createHierarchyMultipleParents(),
     createHierarchyNoParents(),
@@ -292,12 +293,21 @@ function createBatchedTranslucentOpaqueMix() {
 }
 
 function createBatchedTextured() {
-    var buildingOptions = clone(buildingTemplate);
-    buildingOptions.baseColorType = BaseColorType.Texture;
-    var tileOptions = {
-        buildingOptions: buildingOptions
-    };
-    return saveBatchedTileset('BatchedTextured', tileOptions);
+    return createBatchTableHierarchy({
+        directory: path.join(
+            outputDirectory,
+            'Batched',
+            'TexturedModel'
+        ),
+        transform: buildingsTransform,
+        gzip: false, //gzip,
+        prettyJson: prettyJson,
+        use3dTilesNext: argv['3d-tiles-next'],
+        useGlb: argv.glb,
+        batchTableBinary:false, //二进制batchtable,针对属性中较长的数字数组，使用
+        //useVertexColors:true, //是否写入顶点颜色
+        compressDracoMeshes: true  //是否使用draco压缩
+    });
 }
 
 function createBatchedColors() {

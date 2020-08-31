@@ -65,17 +65,17 @@ var whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
  */
 let buildStoreyMap;
 export function createBatchTableHierarchy(options) {
-    var use3dTilesNext = defaultValue(options.use3dTilesNext, false);
-    var useGlb = defaultValue(options.useGlb, false);
-    var gzip = defaultValue(options.gzip, false);
-    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
-    var noParents = defaultValue(options.noParents, false);
-    var multipleParents = defaultValue(options.multipleParents, false);
-    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    const use3dTilesNext = defaultValue(options.use3dTilesNext, false);
+    const useGlb = defaultValue(options.useGlb, false);
+    const gzip = defaultValue(options.gzip, false);
+    const useBatchTableBinary = defaultValue(options.batchTableBinary, false);
+    const noParents = defaultValue(options.noParents, false);
+    const multipleParents = defaultValue(options.multipleParents, false);
+    const transform = defaultValue(options.transform, Matrix4.IDENTITY);
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/center/";
+    var directoryPath = "../data/bim/openhouse/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         const xmlJson = value.xmlJson;
@@ -145,8 +145,8 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            /*return createB3dmTile11(options);
-            return ;*/
+            return createB3dmTile11(options);
+            /*return ;
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
                 gltfMap.forEach((value,key) =>{
@@ -171,19 +171,19 @@ export function createBatchTableHierarchy(options) {
             }
 
             try {
-                /*var box1 = new math_ds.Box3(
+                /!*var box1 = new math_ds.Box3(
                     new math_ds.Vector3( rootbounds.center.z - rootbounds.dimensions.z / 2,
                         rootbounds.center.x - rootbounds.dimensions.x / 2, rootbounds.center.y - rootbounds.dimensions.y / 2),
                     new math_ds.Vector3( rootbounds.center.z + rootbounds.dimensions.z / 2,
                         rootbounds.center.x + rootbounds.dimensions.x / 2, rootbounds.center.y + rootbounds.dimensions.y / 2),
                 );
-                console.log(box1);*/
+                console.log(box1);*!/
                 var rootbox = new math_ds.Box3(
                     new math_ds.Vector3(rootbounds.minXYZ[2],rootbounds.minXYZ[0],rootbounds.minXYZ[1]),
                     new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
                 );
                 //console.log(box);
-                /**
+                /!**
                  * Constructs a new point octree.  constructor(min, max, bias = 0.0, maxPoints = 8, maxDepth = 8)
                  *
                  * @param {Vector3} [min] - The lower bounds of the tree.
@@ -191,7 +191,7 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [bias=0.0] - An octant boundary bias.
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
-                 */
+                 *!/
                 const maxPoints = Math.round(gltfMap.size / 8);
 
                 const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
@@ -199,9 +199,9 @@ export function createBatchTableHierarchy(options) {
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 });
-                /*for(var [key, value] of gltfMap){
+                /!*for(var [key, value] of gltfMap){
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
-                }*/
+                }*!/
 
                 if(octree.pointCount !== gltfMap.size){
                     console.error("模型缺失！");
@@ -236,8 +236,8 @@ export function createBatchTableHierarchy(options) {
                     }
                     ++i;
                 }
-                /*console.log(i);
-                console.log(JSON.stringify(octree));*/
+                /!*console.log(i);
+                console.log(JSON.stringify(octree));*!/
                 try {
                     var depth = octree.getDepth();
                     for (let j = 1; j < depth; j++) {
@@ -286,7 +286,7 @@ export function createBatchTableHierarchy(options) {
                 })
             }catch (e) {
                 console.error(e)
-            }
+            }*/
 
         })
 
@@ -557,14 +557,14 @@ function createB3dmTile11(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_all/name.txt", 'utf-8', function (err,data) {
+    return fsExtra.readFile("../data/bim/texturemodel/name.txt", 'utf-8', function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_all/'+value);
+                urls.push('../data/bim/texturemodel/'+value);
             })
 
             var instances = createInstances11(noParents, multipleParents,urls.length,urls);
@@ -597,7 +597,7 @@ function createB3dmTile11(options) {
              ];*/
 
 
-            var contentUri = 'tile.b3dm';
+            var contentUri = 'tile.glb';
             var directory = options.directory;
             var tilePath = path.join(directory, contentUri);
             var tilesetJsonPath = path.join(directory, 'tileset.json');
@@ -644,11 +644,11 @@ function createB3dmTile11(options) {
 
             return Promise.map(urls, function(url) {
                 //console.log(url);
-                const glb = fsExtra.readFileSync(url);
+                /*const glb = fsExtra.readFileSync(url);
                 return glbToGltf(glb).then(function(result) {
                     try { //{gltf:gltf,separateResources:{}}
-                        /*if(url.indexOf("3k78sW2oH8swtbeSMzotXs") >= 0)
-                            debugger*/
+                        /!*if(url.indexOf("3k78sW2oH8swtbeSMzotXs") >= 0)
+                            debugger*!/
                         return Mesh.fromGltf(result.gltf,false);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
                     }catch (e) {
                         console.error(e);
@@ -656,13 +656,13 @@ function createB3dmTile11(options) {
                     }
                 }).catch(function (error) {
                     console.error(error);
-                });
-                /*return fsExtra.readJson(url)
+                });*/
+                return fsExtra.readJson(url)
                     .then(function(gltf) {
                         return Mesh.fromGltf(gltf,true);               //丢失了gltf中mesh0的matrix信息，在ifcopenshell中指定use-world-coords，最后将顶点信息写入gltf_buffer
                     }).catch(function (reason) {
                         console.error(reason);
-                    });*/
+                    });
             }).then(function(meshes) {
                 var meshesLength = meshes.length;
                 console.log("ssssssss"+ meshesLength);
@@ -679,6 +679,7 @@ function createB3dmTile11(options) {
                 //var batchedMesh = clonedMeshes[0];
                 try {
                     return createGltf({
+                        resourcePath:'/data/bim/texturemodel/',
                         mesh : batchedMesh,
                         compressDracoMeshes : false,
                         //useBatchIds : false
@@ -688,9 +689,9 @@ function createB3dmTile11(options) {
                 }
 
             }).then(function(glb) {
-                console.log(glb);
-                //return saveBinary(tilePath, glb, options.gzip)
-                var b3dm = createB3dm({
+                // console.log(gltf);
+                return saveBinary(tilePath, glb, options.gzip)
+                /*var b3dm = createB3dm({
                     glb : glb,
                     featureTableJson : featureTableJson,
                     batchTableJson : batchTableJson,
@@ -699,7 +700,7 @@ function createB3dmTile11(options) {
                 return Promise.all([
                     saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
                     saveBinary(tilePath, b3dm, options.gzip)
-                ]);
+                ]);*/
             });
         }
     });

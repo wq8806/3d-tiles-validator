@@ -1,7 +1,8 @@
-import { Material } from './Material';
+import { Material ,TexturedMaterial} from './Material';
 import { MeshView } from './meshView';
 import { bufferToUint16Array,bufferToUint32Array, bufferToFloat32Array } from './bufferUtil';
 import { Gltf } from './gltfType';
+import {Quaternion} from "cesium";
 const Cesium = require('cesium');
 const util = require('./utility');
 
@@ -442,7 +443,12 @@ export class Mesh {
             undefined,
             material
         );*/
-        const gltfPrimitiveArray = gltf.meshes[0].primitives;
+        const meshes = gltf.meshes;
+        let gltfPrimitiveArray = [];
+        for (let i = 0; i < meshes.length; i++) {
+            gltfPrimitiveArray = gltfPrimitiveArray.concat(meshes[i].primitives);
+        }
+        // const gltfPrimitiveArray = gltf.meshes[0].primitives;
         let gltfPositions = [];
         let gltfNormals = [];
         let gltfUvs = [];
@@ -459,7 +465,7 @@ export class Mesh {
         for (var i = 0; i < primitivesLength; ++i) {
             var primitive = gltfPrimitiveArray[i];        //部分缺失
             var primitiveMaterial = gltf.materials[primitive.material];
-            var material = Material.fromGltf(primitiveMaterial);
+            var material = Material.fromGltf(primitiveMaterial,gltf);
             var indicesAccessor = gltf.accessors[primitive.indices];
             var indices = getAccessor(gltf, indicesAccessor);
             if (indicesAccessor.componentType === ComponentDatatype.UNSIGNED_INT){
@@ -467,16 +473,17 @@ export class Mesh {
             }
             var positions = getAccessor(gltf, gltf.accessors[primitive.attributes.POSITION]);
             var normals = getAccessor(gltf, gltf.accessors[primitive.attributes.NORMAL]);
-            var uvs = new Array(positions.length / 3 * 2).fill(0);
+            const uvs = getAccessor(gltf, gltf.accessors[primitive.attributes.TEXCOORD_0])
+            // var uvs = new Array(positions.length / 3 * 2).fill(0);
             var vertexColors = new Array(positions.length / 3 * 4).fill(0);
 
             const vertexCount = positions.length / 3;
-            if(useVertexColor){
+            /*if(useVertexColor){
                 for (let i = 0; i < vertexCount; ++i) {
-                    /*vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
+                    /!*vertexColors[i * 4 + 0] = Math.floor(material.baseColor[0] * 255);
                     vertexColors[i * 4 + 1] = Math.floor(material.baseColor[1] * 255);
                     vertexColors[i * 4 + 2] = Math.floor(material.baseColor[2] * 255);
-                    vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);*/
+                    vertexColors[i * 4 + 3] = Math.floor(material.baseColor[3] * 255);*!/
                     vertexColors[i * 4 + 0] = material.baseColor[0];
                     vertexColors[i * 4 + 1] = material.baseColor[1];
                     vertexColors[i * 4 + 2] = material.baseColor[2];
@@ -487,7 +494,7 @@ export class Mesh {
                 }else {
                     material = whiteOpaqueMaterial;
                 }
-            }
+            }*/
 
             // var vertexCount = positions.length / 3;
             var batchIds = new Array(vertexCount).fill(i);
@@ -523,7 +530,7 @@ export class Mesh {
             indexOffset += indicesLength;
         }
 
-        return new Mesh(
+        const mesh_result = new Mesh(
             gltfIndices,
             gltfPositions,
             gltfNormals,
@@ -534,6 +541,18 @@ export class Mesh {
             views,
             gltfHasUint32indeces
         );
+        let translation = new Cartesian3(0,0,0);
+        let rotation = new Quaternion(0,0,0,0);
+        let scale = new Cartesian3(1.0, 1.0, 1.0);
+        if(gltf.nodes[0]['translation']){
+            translation = new Cartesian3(gltf.nodes[0]['translation'][0],gltf.nodes[0]['translation'][1],gltf.nodes[0]['translation'][2]);
+        }
+        if(gltf.nodes[0]['rotation']){
+            rotation = new Quaternion(gltf.nodes[0]['rotation'][0],gltf.nodes[0]['rotation'][1],gltf.nodes[0]['rotation'][2],gltf.nodes[0]['rotation'][3]);
+        }
+        const matrix4 = Matrix4.fromTranslationQuaternionRotationScale(translation, rotation, scale);
+        mesh_result.transform(matrix4);
+        return this.clone(mesh_result);
     };
 }
 
@@ -551,7 +570,6 @@ function getAccessor(gltf, accessor) {
     } else if (accessor.componentType === ComponentDatatype.FLOAT) {
         typedArray = bufferToFloat32Array(data, byteOffset, length);
     } else if (accessor.componentType === ComponentDatatype.UNSIGNED_INT){   //较少出现，顶点索引 > 65536时
-        this
         typedArray = bufferToUint32Array(data, byteOffset, length);
     }
     return Array.prototype.slice.call(typedArray);
@@ -571,12 +589,18 @@ function findSameMaterial(view,views){
 
 function getSameMaterial(views,view) {
     for (let i = 0; i < views.length; i++) {
-        if(views[i].material.baseColor[0] === view.material.baseColor[0] &&
-            views[i].material.baseColor[1] === view.material.baseColor[1] &&
-            views[i].material.baseColor[2] === view.material.baseColor[2] &&
-            views[i].material.baseColor[3] === view.material.baseColor[3] &&
-            views[i].material.alphaMode === view.material.alphaMode){
-            return views[i];
+        if(view.material instanceof Material){
+            if(views[i].material.baseColor[0] === view.material.baseColor[0] &&
+                views[i].material.baseColor[1] === view.material.baseColor[1] &&
+                views[i].material.baseColor[2] === view.material.baseColor[2] &&
+                views[i].material.baseColor[3] === view.material.baseColor[3] &&
+                views[i].material.alphaMode === view.material.alphaMode){
+                return views[i];
+            }
+        }else if(view.material instanceof TexturedMaterial){
+            if(views[i].material.baseColor === view.material.baseColor){
+                return view[i];
+            }
         }
     }
     return null;

@@ -1,7 +1,7 @@
-import { Material } from './Material';
+import {Material, TexturedMaterial} from './Material';
 
 export class MeshView {
-    material: Material;
+    material: Material | TexturedMaterial;
     indexOffset: number;
     indexCount: number;
 
@@ -16,7 +16,7 @@ export class MeshView {
      * @constructor
      * @private
      */
-    constructor(material: Material, indexOffset: number, indexCount: number) {
+    constructor(material: Material | TexturedMaterial, indexOffset: number, indexCount: number) {
         this.material = material;
         this.indexOffset = indexOffset;
         this.indexCount = indexCount;
