@@ -690,6 +690,7 @@ function createB3dmTile11(options) {
 
             }).then(function(glb) {
                 // console.log(gltf);
+                // return saveJson(tilePath,glb,options.prettyJson);
                 return saveBinary(tilePath, glb, options.gzip)
                 /*var b3dm = createB3dm({
                     glb : glb,

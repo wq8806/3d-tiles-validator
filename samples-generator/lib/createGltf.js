@@ -8,6 +8,7 @@ var getMinMax = require('./getMinMax');
 
 var gltfPipeline = require('gltf-pipeline');
 var gltfToGlb = gltfPipeline.gltfToGlb;
+const processGltf = gltfPipeline.processGltf;
 
 module.exports = createGltf;
 
@@ -605,6 +606,9 @@ function createGltf(options) {
     if(compressDracoMeshes){
         gltfOptions.dracoOptions = compressDracoMeshesdefaults;
     }
+    /*return processGltf(gltf,gltfOptions).then(function (results) {
+        return results.gltf;
+    });*/
     return gltfToGlb(gltf, gltfOptions)
         .then(function(results) {
             return results.glb;

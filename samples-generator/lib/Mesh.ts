@@ -508,7 +508,7 @@ export class Mesh {
             //var indices = mesh.indices;
             var indicesLength = indices.length;
 
-            if (!defined(currentView) || (currentView.material !== material)) {
+            if (!defined(currentView) || (currentView.material.baseColor !== material.baseColor)) {
                 currentView = new MeshView(
                     material,
                     indexOffset,
@@ -542,7 +542,7 @@ export class Mesh {
             gltfHasUint32indeces
         );
         let translation = new Cartesian3(0,0,0);
-        let rotation = new Quaternion(0,0,0,0);
+        let rotation = new Quaternion(0,0,0,1);
         let scale = new Cartesian3(1.0, 1.0, 1.0);
         if(gltf.nodes[0]['translation']){
             translation = new Cartesian3(gltf.nodes[0]['translation'][0],gltf.nodes[0]['translation'][1],gltf.nodes[0]['translation'][2]);
