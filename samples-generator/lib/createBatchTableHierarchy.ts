@@ -75,7 +75,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/center/";
+    var directoryPath = "../data/bim/sample_all/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         const xmlJson = value.xmlJson;
@@ -178,6 +178,22 @@ export function createBatchTableHierarchy(options) {
                         rootbounds.center.x + rootbounds.dimensions.x / 2, rootbounds.center.y + rootbounds.dimensions.y / 2),
                 );
                 console.log(box1);*/
+                //获取模型包围盒中心点的范围
+                const centerPoints = [];
+                const xArr = [];
+                const yArr = [];
+                const zArr = [];
+                gltfMap.forEach(function(value,key){
+                    xArr.push(value.center.z);
+                    yArr.push(value.center.x);
+                    zArr.push(value.center.y);
+                    centerPoints.push(new math_ds.Vector3(value.center.z,value.center.x,value.center.y));
+                });
+                /*const rootbox = new math_ds.Box3(
+                    new math_ds.Vector3(Math.min.apply(null,xArr),Math.min.apply(null,yArr),Math.min.apply(null,zArr)),
+                    new math_ds.Vector3(Math.max.apply(null,xArr),Math.max.apply(null,yArr),Math.max.apply(null,zArr))
+                );*/
+
                 var rootbox = new math_ds.Box3(
                     new math_ds.Vector3(rootbounds.minXYZ[2],rootbounds.minXYZ[0],rootbounds.minXYZ[1]),
                     new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
