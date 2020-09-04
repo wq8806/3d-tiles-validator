@@ -38,7 +38,8 @@ var saveJson = require('./saveJson');
 import { readXml,Bounds} from "./readXml";
 var readGltfNames = require('./readGltfNames');
 var math_ds = require('math-ds');
-var PointOctree = require('sparse-octree');
+// var PointOctree = require('sparse-octree');
+import {Octree, PointOctree} from "./sparse-octree.esm";
 import {JSONPath} from 'jsonpath-plus';
 
 var sizeOfFloat = 4;
@@ -75,7 +76,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/sample_all/";
+    var directoryPath = "../data/bim/center/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         const xmlJson = value.xmlJson;
@@ -180,6 +181,7 @@ export function createBatchTableHierarchy(options) {
                 console.log(box1);*/
                 //获取模型包围盒中心点的范围
                 const centerPoints = [];
+                const datas = [];
                 const xArr = [];
                 const yArr = [];
                 const zArr = [];
@@ -188,16 +190,17 @@ export function createBatchTableHierarchy(options) {
                     yArr.push(value.center.x);
                     zArr.push(value.center.y);
                     centerPoints.push(new math_ds.Vector3(value.center.z,value.center.x,value.center.y));
+                    datas.push({name:key,value:value});
                 });
-                /*const rootbox = new math_ds.Box3(
+                const rootbox = new math_ds.Box3(
                     new math_ds.Vector3(Math.min.apply(null,xArr),Math.min.apply(null,yArr),Math.min.apply(null,zArr)),
                     new math_ds.Vector3(Math.max.apply(null,xArr),Math.max.apply(null,yArr),Math.max.apply(null,zArr))
-                );*/
+                );
 
-                var rootbox = new math_ds.Box3(
+                /*var rootbox = new math_ds.Box3(
                     new math_ds.Vector3(rootbounds.minXYZ[2],rootbounds.minXYZ[0],rootbounds.minXYZ[1]),
                     new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
-                );
+                );*/
                 //console.log(box);
                 /**
                  * Constructs a new point octree.  constructor(min, max, bias = 0.0, maxPoints = 8, maxDepth = 8)
@@ -210,20 +213,21 @@ export function createBatchTableHierarchy(options) {
                  */
                 const maxPoints = Math.round(gltfMap.size / 8);
 
-                const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
-                gltfMap.forEach(function(value,key){
+                const octree: PointOctree = new PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
+                /*gltfMap.forEach(function(value,key){
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
-                    octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
-                });
+                    octree.insert(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
+                });*/
                 /*for(var [key, value] of gltfMap){
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 }*/
+                octree.setAllPoints(centerPoints,datas);
 
                 if(octree.pointCount !== gltfMap.size){
                     console.error("模型缺失！");
                 }
                 if(octree.getDepth() > 0){
-                    octree.root.tile = null;
+                    octree['root']['tile'] = null;
                 }
                 const iterator = octree.leaves();
 
@@ -231,8 +235,8 @@ export function createBatchTableHierarchy(options) {
                 // var children = [];
                 while(!iterator.next().done) {
                     // console.log(iterator.indices);
-                    var indicesArr = iterator.indices;
-                    let currentOctant = iterator.result.value;
+                    var indicesArr = iterator['indices'];
+                    let currentOctant = iterator['result'].value;
                     // currentOctant.tile = null;
                     if(currentOctant.children === null){
                         if(currentOctant.data !== null){
@@ -257,7 +261,7 @@ export function createBatchTableHierarchy(options) {
                 try {
                     var depth = octree.getDepth();
                     for (let j = 1; j < depth; j++) {
-                        var octants = octree.findOctantsByLevel(j);
+                        var octants = octree['findOctantsByLevel'](j);
                         for (let k = 0; k < octants.length; k++) {
                             let currentOctant = octants[k];
                             var minAndmaxobj = modifyOctantWithChildren_MinMax(currentOctant,undefined);
@@ -273,7 +277,7 @@ export function createBatchTableHierarchy(options) {
                     }
                     // console.log(JSON.stringify(octree.root.children));
 
-                    var testss = getRootJSONFromOctree(octree.root);
+                    var testss = getRootJSONFromOctree(octree['root']);
                     deleteNull(testss);
 
                     // console.log(JSON.stringify(testss));
