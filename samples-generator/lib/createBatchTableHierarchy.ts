@@ -1,3 +1,4 @@
+// @ts-ignore
 import { Promise } from 'bluebird';
 import { calculateFilenameExt } from './calculateFilenameExt';
 import { createFeatureHierarchySubExtension } from './createFeatureHierarchySubExtension';
@@ -11,6 +12,7 @@ import {
     defined,
     Math as CesiumMath,
     Matrix4,
+    Matrix3,
     Quaternion,
 } from 'cesium';
 var Cesium = require('cesium');
@@ -25,6 +27,7 @@ import createGltf = require('./createGltf');
 import { createTilesetJsonSingle } from './createTilesetJsonSingle';
 import { createFeatureMetadataExtension } from './createFeatureMetadataExtension';
 import { Extensions } from './Extensions';
+import { getGltfFromGlbUri } from "./gltfFromUri";
 
 var typeConversion = require('./typeConversion');
 var getMinMax = require('./getMinMax');
@@ -40,6 +43,9 @@ var readGltfNames = require('./readGltfNames');
 var math_ds = require('math-ds');
 var PointOctree = require('sparse-octree');
 import {JSONPath} from 'jsonpath-plus';
+import {generateInstancesBatchTable} from "./createInstancesTile";
+import {FLOAT32_SIZE_BYTES, UINT16_SIZE_BYTES, UINT32_SIZE_BYTES, UINT8_SIZE_BYTES} from "./typeSize";
+const createI3dm = require('./createI3dm');
 
 var sizeOfFloat = 4;
 var sizeOfUint16 = 2;
@@ -145,7 +151,7 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            /*return createB3dmTile11(options);
+            /*return createI3dmTile(options);
             return ;*/
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
@@ -476,12 +482,11 @@ function createB3dmTile(options) {
 
     // Local transforms of the buildings within the tile
     var buildingTransforms = [
-        Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation90, scale)
+        Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation0, scale)
     ];
     /* var buildingTransforms = [
          Matrix4.fromTranslation(buildingPositions[0])
      ];*/
-
 
     var contentUri = options.b3dmName;
     var directory = options.directory;
@@ -719,6 +724,344 @@ function createB3dmTile11(options) {
             });
         }
     });
+}
+
+function createI3dmTile(options) {
+    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
+    var noParents = defaultValue(options.noParents, false);
+    var multipleParents = defaultValue(options.multipleParents, false);
+    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
+
+
+    // Mesh urls listed in the same order as features in the classIds arrays
+    var urls = [];
+    return fsExtra.readFile("../data/bim/sample_i3dm/name.txt", 'utf-8', async function (err,data) {
+        if(err){
+            console.error(err);
+        }
+        else{
+
+            var str_array = data.split(",");
+            str_array.forEach(function (value) {
+                urls.push('../data/bim/sample_i3dm/'+value);
+            })
+
+            var instances = createInstances11(noParents, multipleParents,urls.length,urls);
+            var batchTableJson = createBatchTableJson(instances, options);
+
+            var batchTableBinary;
+            if (useBatchTableBinary) {
+                batchTableBinary = createBatchTableBinary(batchTableJson, options);  // Modifies the json in place
+            }
+
+            /*var buildingPositions = [
+                new Cartesian3(-29.73924456, 79.6033968, 0)     //若ifcopenshell未指定use-world-coord，则导出dae时最顶层mesh包含matrix信息，需要每个ifcElement中转换矩阵的平移量 -y*LengthUnit  x*LengthUnit,对应gltf中的mesh0Matrix
+            ];*/
+
+            var buildingPositions = [
+                new Cartesian3(0,0,0)   //ifcopenshell指定use-world-coord,gltf中顶点位置已含转换信息，无需再做平移变换
+            ];
+
+            // glTF models are initially y-up, transform to z-up
+            var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
+            var zUpRotation0 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, 0);            //每个ifcElement中转换矩阵旋转矩阵为单位阵时使用
+            var scale = new Cartesian3(1.0, 1.0, 1.0); // Scale the models up a bit
+
+            // Local transforms of the buildings within the tile
+            var buildingTransforms = [
+                Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation0, scale)
+            ];
+            /* var buildingTransforms = [
+                 Matrix4.fromTranslation(buildingPositions[0])
+             ];*/
+
+
+            var contentUri = 'tile.i3dm';
+            var directory = options.directory;
+            var tilePath = path.join(directory, contentUri);
+            var tilesetJsonPath = path.join(directory, 'tileset.json');
+
+            var buildingsLength = 1;
+            var meshesLength = urls.length;
+            var batchLength = buildingsLength * meshesLength;
+            var geometricError = 70.0;
+
+            var box = [
+                -22.48, 52.06, 5.33,
+                78.55, 0, 0,
+                0, 159.535, 0,
+                0, 0, 7.155
+            ];
+            /* var box = [
+                 0, 0, -1.17,
+                 10, 0, 0,
+                 0, 10, 0,
+                 0, 0, 6.955
+             ];*/
+            /* var box = [
+                 0, 0, 10,
+                 50, 0, 0,
+                 0, 50, 0,
+                 0, 0, 10
+             ];*/
+
+            var tilesetJson = createTilesetJsonSingle({
+                contentUri : contentUri,
+                geometricError : geometricError,
+                box : box,
+                transform : transform
+            } as any);
+
+            if (!options.legacy) {
+                Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
+                Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
+            }
+
+            let gltf = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+                {
+                    resourceDirectory : urls[0]
+                });
+            debugger
+            const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1]
+            const mat4 = Matrix4.fromColumnMajorArray(placementArray);
+            const translation = Matrix4.getTranslation(mat4,new Cartesian3());
+
+            const inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
+            const mesh = Mesh.fromGltf(gltf);
+            const transformMesh = Mesh.clone(mesh);
+            transformMesh.transform(inverse_mat4);
+            const batchedMesh = Mesh.batch([transformMesh]);
+            const template = await createGltf({
+                mesh : batchedMesh,
+                compressDracoMeshes : false,
+                //useBatchIds : false
+            });
+            /*const template_glb = await createGlb({
+                mesh : batchedMesh,
+                compressDracoMeshes : false,
+                //useBatchIds : false
+            });*/
+            // return saveBinary(tilePath, template, options.gzip);
+            const instancesplacementArray = [
+                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
+                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1]
+            ]
+            const instancesLength = 2;
+            const featureTableJson: any = {};
+            featureTableJson.INSTANCES_LENGTH = instancesLength;
+
+            let attributes = [];
+            attributes.push(
+                getPositions(instancesplacementArray)
+            );
+
+            const orientations = true;
+            const eastNorthUp = defaultValue(options.eastNorthUp, false);
+            if (orientations) {
+                attributes = attributes.concat(getOrientations(instancesplacementArray));
+            } else if (eastNorthUp) {
+                featureTableJson.EAST_NORTH_UP = true;
+            }
+            const batchIds = true;
+            if (batchIds) {
+                attributes.push(getBatchIds(instancesLength));
+            }
+
+            let i;
+            let attribute;
+            let byteOffset = 0;
+            let attributesLength = attributes.length;
+            for (i = 0; i < attributesLength; ++i) {
+                attribute = attributes[i];
+                const byteAlignment = attribute.byteAlignment;
+                byteOffset = Math.ceil(byteOffset / byteAlignment) * byteAlignment; // Round up to the required alignment
+                attribute.byteOffset = byteOffset;
+                byteOffset += attribute.buffer.length;
+            }
+
+            const featureTableBinary = Buffer.alloc(byteOffset);
+
+            for (i = 0; i < attributesLength; ++i) {
+                attribute = attributes[i];
+                featureTableJson[attribute.propertyName] = {
+                    byteOffset: attribute.byteOffset,
+                    componentType: attribute.componentType // Only defined for batchIds
+                };
+                attribute.buffer.copy(featureTableBinary, attribute.byteOffset);
+            }
+
+            /*let batchTableJson;
+            let batchTableBinary;
+            const createBatchTable = true;
+            if (createBatchTable) {
+                batchTableJson = generateInstancesBatchTable(
+                    instancesLength,
+                    modelSize
+                );
+            }*/
+
+            const i3dm = createI3dm({
+                featureTableJson: featureTableJson,
+                featureTableBinary: featureTableBinary,
+                batchTableJson: batchTableJson,
+                batchTableBinary: batchTableBinary,
+                glb: template,
+                // uri: ""   未指定glb，时读glb文件
+            });
+            return Promise.all([
+                saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
+                saveBinary(tilePath, i3dm, options.gzip)
+            ]);
+            return saveJson(tilePath,template,options.prettyJson);
+
+        }
+    });
+}
+
+function getBatchIds(instancesLength: number) {
+    let i: number;
+    let buffer: Buffer;
+    let componentType: string;
+    let byteAlignment: number;
+
+    if (instancesLength < 256) {
+        buffer = Buffer.alloc(instancesLength * UINT8_SIZE_BYTES);
+        for (i = 0; i < instancesLength; ++i) {
+            buffer.writeUInt8(i, i * UINT8_SIZE_BYTES);
+        }
+        componentType = 'UNSIGNED_BYTE';
+        byteAlignment = UINT8_SIZE_BYTES;
+    } else if (instancesLength < 65536) {
+        buffer = Buffer.alloc(instancesLength * UINT16_SIZE_BYTES);
+        for (i = 0; i < instancesLength; ++i) {
+            buffer.writeUInt16LE(i, i * UINT16_SIZE_BYTES);
+        }
+        componentType = 'UNSIGNED_SHORT';
+        byteAlignment = UINT16_SIZE_BYTES;
+    } else {
+        buffer = Buffer.alloc(instancesLength * UINT32_SIZE_BYTES);
+        for (i = 0; i < instancesLength; ++i) {
+            buffer.writeUInt32LE(i, i * UINT32_SIZE_BYTES);
+        }
+        componentType = 'UNSIGNED_INT';
+        byteAlignment = UINT32_SIZE_BYTES;
+    }
+
+    return {
+        buffer: buffer,
+        componentType: componentType,
+        propertyName: 'BATCH_ID',
+        byteAlignment: byteAlignment
+    };
+}
+let right;
+function getNormal(instancesplacement) {
+    const matrix4 = Matrix4.fromColumnMajorArray(instancesplacement);
+    const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
+    const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
+    const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
+    const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
+    const angle = Quaternion.computeAngle(quaternion);
+    const angle_degree = CesiumMath.toDegrees(angle);
+    debugger
+    /*const x = CesiumMath.nextRandomNumber();
+    const y = CesiumMath.nextRandomNumber();
+    const z = CesiumMath.nextRandomNumber();
+
+    const normal = new Cartesian3(x, y, z);*/
+    // const normal = axis;
+    var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
+    var zUpRotation90 = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, 0 - CesiumMath.PI_OVER_TWO);
+    const matrix3_yz = Matrix3.fromQuaternion(yUpToZUp);
+    const matrix3_zup = Matrix3.fromQuaternion(zUpRotation90);
+    let rotation = Matrix3.multiply(matrix3_yz,rotation_mat3,new Matrix3());
+    // rotation = Matrix3.multiply(matrix3_zup,rotation,new Matrix3());
+    const up = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(0,1,0),new Cartesian3());
+    right = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(1,0,0),new Cartesian3());
+
+    const normal = up;//new Cartesian3(0,-1,0);
+    Cartesian3.normalize(normal, normal);
+    return normal;
+}
+
+function generateRandomNormal() {
+    const x = CesiumMath.nextRandomNumber();
+    const y = CesiumMath.nextRandomNumber();
+    const z = CesiumMath.nextRandomNumber();
+
+    const normal = new Cartesian3(x, y, z);
+    Cartesian3.normalize(normal, normal);
+    return normal;
+}
+
+function getOrthogonalNormal(normal) {
+    /*const randomNormal = generateRandomNormal();
+    const orthogonal = Cartesian3.cross(normal, randomNormal, randomNormal);
+    return Cartesian3.normalize(orthogonal, orthogonal);*/
+    const orthogonal = right;//new Cartesian3(-1,0,0);
+    return Cartesian3.normalize(orthogonal, orthogonal);
+}
+
+function getOrientations(instancesplacementArray) {
+    const instancesLength = instancesplacementArray.length
+    const normalsUpBuffer = Buffer.alloc(
+        instancesLength * 3 * FLOAT32_SIZE_BYTES
+    );
+    const normalsRightBuffer = Buffer.alloc(
+        instancesLength * 3 * FLOAT32_SIZE_BYTES
+    );
+    for (let i = 0; i < instancesLength; ++i) {
+        const normalUp = getNormal(instancesplacementArray[i]);
+        normalsUpBuffer.writeFloatLE(normalUp.x, i * 3 * FLOAT32_SIZE_BYTES);
+        normalsUpBuffer.writeFloatLE(normalUp.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
+        normalsUpBuffer.writeFloatLE(normalUp.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
+
+        const normalRight = getOrthogonalNormal(normalUp);
+        normalsRightBuffer.writeFloatLE(normalRight.x, i * 3 * FLOAT32_SIZE_BYTES);
+        normalsRightBuffer.writeFloatLE(normalRight.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
+        normalsRightBuffer.writeFloatLE(normalRight.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
+    }
+
+    return [
+        {
+            buffer: normalsUpBuffer,
+            propertyName: 'NORMAL_UP',
+            byteAlignment: FLOAT32_SIZE_BYTES
+        },
+        {
+            buffer: normalsRightBuffer,
+            propertyName: 'NORMAL_RIGHT',
+            byteAlignment: FLOAT32_SIZE_BYTES
+        }
+    ];
+}
+
+function getPosition(transform) {
+    const matrix4 = Matrix4.fromColumnMajorArray(transform);
+    //const scale = Matrix4.getScale(matrix4,new Cartesian3());
+    let position = new Cartesian3(0, 0, 0);
+    Matrix4.multiplyByPoint(matrix4, position, position);
+
+    return position;
+}
+
+function getPositions(transformArray) {
+    const instancesLength = transformArray.length;
+    const buffer = Buffer.alloc(instancesLength * 3 * FLOAT32_SIZE_BYTES);
+    for (let i = 0; i < instancesLength; ++i) {
+        const position = getPosition(
+            transformArray[i]
+        );
+        buffer.writeFloatLE(position.x, i * 3 * FLOAT32_SIZE_BYTES);
+        buffer.writeFloatLE(position.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
+        buffer.writeFloatLE(position.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
+    }
+    return {
+        buffer: buffer,
+        propertyName: 'POSITION',
+        byteAlignment: FLOAT32_SIZE_BYTES
+    };
 }
 
 function deleteNull(tempObj) {

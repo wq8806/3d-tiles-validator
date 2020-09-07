@@ -8,7 +8,10 @@ import {
     defined,
     Math as CesiumMath,
     Matrix4,
-    Quaternion
+    Matrix3,
+    Transforms,
+    HeadingPitchRoll,
+    Quaternion, Ellipsoid
 } from 'cesium';
 import { Promise as Bluebird } from 'bluebird';
 import { calculateFilenameExt } from '../lib/calculateFilenameExt';
@@ -1373,18 +1376,23 @@ async function savePointCloudTimeDynamic(name, options) {
 }
 
 function createHierarchy() {
-    var zUpRotation90 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, CesiumMath.PI_OVER_TWO);
+    /*const origin = Cartesian3.fromRadians(longitude, latitude, 0.0);
+    const normal =  Ellipsoid.WGS84.geodeticSurfaceNormal(origin);
+    const normalized = Cartesian3.normalize(normal,new Cartesian3());
+    var zUpRotation90 = Quaternion.fromAxisAngle(normalized, CesiumMath.PI_OVER_TWO);
     var angle = Quaternion.computeAngle(zUpRotation90);
-    //var rotationMatrix = Cesium.Matrix3.fromQuaternion(zUpRotation90);
-    //var transformMatrix4 = Matrix4.fromRotationTranslation(rotationMatrix,Cartesian3.ZERO);
-    //buildingsTransform = Cesium.Transforms.headingPitchRollToFixedFrame(Cartesian3.fromRadians(longitude, latitude, 0.0), new Cesium.HeadingPitchRoll(angle,0,0));
+    var rotationMatrix = Matrix3.fromQuaternion(zUpRotation90);
+    var transformMatrix4 = Matrix4.fromRotationTranslation(rotationMatrix,Cartesian3.ZERO);
+    const buildingTransform_rotation = Matrix4.multiply(buildingsTransform,transformMatrix4,new Matrix4());*/  //矩阵乘法不满足交换律，可以结合律，做变换是变换矩阵左乘
+    //b3dm需旋绕Z转90，i3dm内部已经旋转，此处不用旋转，因此旋转都放置内部完成
+    const buildingsTransform1 = Transforms.headingPitchRollToFixedFrame(Cartesian3.fromRadians(longitude, latitude, 0.0), new HeadingPitchRoll(CesiumMath.PI_OVER_TWO,0,0));
     return createBatchTableHierarchy({
         directory: path.join(
             outputDirectory,
             'Hierarchy',
             'BatchTableHierarchy'
         ),
-        transform: buildingsTransform,
+        transform: buildingsTransform, //buildingsTransform1,
         gzip: false, //gzip,
         prettyJson: prettyJson,
         use3dTilesNext: argv['3d-tiles-next'],
