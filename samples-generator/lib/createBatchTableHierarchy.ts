@@ -816,22 +816,28 @@ function createI3dmTile(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-
-            let gltf = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+            //对应下方的模板信息进行更改
+            let gltf = await getGltfFromGlbUri(urls[3],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
                 {
                     resourceDirectory : urls[0]
                 });
             debugger
-            const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1]
+           /* const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1] //07hc1aZW98debjzrL5HoR4 第二排第四个
             const boundsobj = {
                 minXYZ : [-0.6448 ,16.9205 ,6.35] ,
                 maxXYZ : [-0.5848 ,18.8705 ,7.565]
-            }
-            const x_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];  //1,0,2
-            const y_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];
+            }*/
+
+            const placementArray = [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
+            const boundsobj = {
+                    minXYZ: [-0.4453 ,-0.6956 ,6.35],
+                    maxXYZ: [0.3797 ,-0.6356 ,7.565]
+                }
+            const x_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
+            const y_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
             const z_length = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
             console.log(x_length + "--" + y_length +"--" + z_length);
-            const scale_template = new Cartesian3(
+            let scale_template = new Cartesian3(
                 1 / x_length,
                 1 / y_length,
                 1 / z_length);
@@ -840,18 +846,13 @@ function createI3dmTile(options) {
             const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
             const rotation_template = Matrix3.getRotation(mat3,mat3);
             const rotation_template_inverse = Matrix3.inverse(rotation_template,new Matrix3());
-            const x_length1 = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
-            const y_length1 = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
-            const z_length1 = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
-            const test1 = new Cartesian3(
-                1 / x_length1,
-                1 / y_length1,
-                1 / z_length1);
-            const scale1 = Matrix3.multiplyByVector(rotation_template,test1,new Cartesian3());
-            console.log(scale1);
-            const scale2 = Matrix3.multiplyByVector(rotation_template_inverse,test1,new Cartesian3());
-            console.log(scale2);
-            const translation = Matrix4.getTranslation(mat4,new Cartesian3());
+            scale_template = Matrix3.multiplyByVector(rotation_template_inverse,scale_template,scale_template);
+            // {
+            //   "x": 0.512820512820513,
+            //   "y": 16.666666666666654,
+            //   "z": 0.8230452674897114
+            // }
+            scale_template = Cartesian3.abs(scale_template,scale_template);
 
             const scaleMatrix = Matrix4.fromScale(scale_template);
             let inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
@@ -862,6 +863,10 @@ function createI3dmTile(options) {
             const transformMesh = Mesh.clone(mesh);
             transformMesh.transform(inverse_mat4);
             const batchedMesh = Mesh.batch([transformMesh]);
+            const center = batchedMesh.center;
+            const center_negate = Cartesian3.negate(center,new Cartesian3());
+            const center_transform = Matrix4.fromTranslation(center_negate);
+            batchedMesh.transform(center_transform);
             const template = await createGltf({
                 mesh : batchedMesh,
                 compressDracoMeshes : false,
@@ -872,7 +877,7 @@ function createI3dmTile(options) {
                 compressDracoMeshes : false,
                 //useBatchIds : false
             });*/
-            return saveBinary(tilePath, template, options.gzip);
+            // return saveBinary(tilePath, template, options.gzip);
             const instancesplacementArray = [
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1],
@@ -905,23 +910,33 @@ function createI3dmTile(options) {
             for (let i = 0; i < instancesBoundsObj.length; i++) {
                 const instanceBounds = instancesBoundsObj[i];
                 let scale = new Cartesian3(
-                    instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
                     instanceBounds.maxXYZ[0] - instanceBounds.minXYZ[0],
+                    instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
                     instanceBounds.maxXYZ[2] - instanceBounds.minXYZ[2]);
                 const matrix4 = Matrix4.fromColumnMajorArray(instancesplacementArray[i]);
                 const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
                 let rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
-                rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
-                /*const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
-                const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
-                const angle = Quaternion.computeAngle(quaternion);
-                const angle_degree = CesiumMath.toDegrees(angle);*/
+                // rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
 
-                const up = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
-                if(i === 2 || i===3 || i === 4){
+                let up = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
+                up = Cartesian3.abs(up,up);
+                if(i===2){
+                    debugger
+                    console.log(scale);
+                    //scale {
+                    //   "x": 1.36665,
+                    //   "y": 0.06000000000000005,
+                    //   "z": 1.2150000000000007
+                    // }
+                }
+                if(i===3 || i === 4){
                     debugger
                     scale = new Cartesian3(scale.y,scale.x,scale.z);
-                    // scale = new Cartesian3(scale)
+                    // 3 scale {
+                    //   "x": 0.825,
+                    //   "y": 0.05999999999999994,
+                    //   "z": 1.2150000000000007
+                    // }
                 }
                 scaleArray.push(up);
             }
