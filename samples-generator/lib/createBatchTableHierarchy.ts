@@ -81,7 +81,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/sample_all/";
+    var directoryPath = "../data/bim/openhouse/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         const xmlJson = value.xmlJson;
@@ -151,8 +151,8 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            /*return createI3dmTile(options);
-            return ;*/
+            return createI3dmTile(options);
+            return ;
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
                 gltfMap.forEach((value,key) =>{
@@ -741,7 +741,6 @@ function createI3dmTile(options) {
             console.error(err);
         }
         else{
-
             var str_array = data.split(",");
             str_array.forEach(function (value) {
                 urls.push('../data/bim/sample_i3dm/'+value);
@@ -824,10 +823,41 @@ function createI3dmTile(options) {
                 });
             debugger
             const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1]
-            const mat4 = Matrix4.fromColumnMajorArray(placementArray);
+            const boundsobj = {
+                minXYZ : [-0.6448 ,16.9205 ,6.35] ,
+                maxXYZ : [-0.5848 ,18.8705 ,7.565]
+            }
+            const x_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];  //1,0,2
+            const y_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];
+            const z_length = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
+            console.log(x_length + "--" + y_length +"--" + z_length);
+            const scale_template = new Cartesian3(
+                1 / x_length,
+                1 / y_length,
+                1 / z_length);
+            let mat4 = Matrix4.fromColumnMajorArray(placementArray);
+            // mat4 = Matrix4.multiplyByScale(mat4,scale_template,mat4);
+            const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
+            const rotation_template = Matrix3.getRotation(mat3,mat3);
+            const rotation_template_inverse = Matrix3.inverse(rotation_template,new Matrix3());
+            const x_length1 = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
+            const y_length1 = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
+            const z_length1 = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
+            const test1 = new Cartesian3(
+                1 / x_length1,
+                1 / y_length1,
+                1 / z_length1);
+            const scale1 = Matrix3.multiplyByVector(rotation_template,test1,new Cartesian3());
+            console.log(scale1);
+            const scale2 = Matrix3.multiplyByVector(rotation_template_inverse,test1,new Cartesian3());
+            console.log(scale2);
             const translation = Matrix4.getTranslation(mat4,new Cartesian3());
 
-            const inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
+            const scaleMatrix = Matrix4.fromScale(scale_template);
+            let inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
+            inverse_mat4 = Matrix4.multiply(scaleMatrix,inverse_mat4,inverse_mat4);
+            // const scale1 = Matrix4.getScale(inverse_mat4,new Cartesian3());
+            // inverse_mat4 = Matrix4.multiplyByScale(inverse_mat4,scale_template,inverse_mat4);
             const mesh = Mesh.fromGltf(gltf);
             const transformMesh = Mesh.clone(mesh);
             transformMesh.transform(inverse_mat4);
@@ -842,12 +872,60 @@ function createI3dmTile(options) {
                 compressDracoMeshes : false,
                 //useBatchIds : false
             });*/
-            // return saveBinary(tilePath, template, options.gzip);
+            return saveBinary(tilePath, template, options.gzip);
             const instancesplacementArray = [
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
-                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1]
-            ]
-            const instancesLength = 2;
+                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1],
+                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,0.187225 ,6.350 ,1],//边角
+                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1],//拐角第一个  07hc1aZW98debjzrL5Ho8h
+                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,1.4047 ,-0.6461 ,6.350 ,1]//拐角第二个 07hc1aZW98debjzrL5Ho8e
+            ];
+            const instancesBoundsObj = [
+                {
+                    minXYZ : [-0.6448 ,16.9205 ,6.35] ,
+                    maxXYZ : [-0.5848 ,18.8705 ,7.565]
+                },
+                {
+                    minXYZ : [-0.6448 ,14.9205 ,6.35] ,
+                    maxXYZ : [-0.5848 ,16.8705 ,7.565]
+                },
+                {
+                    minXYZ: [-0.6448 ,-0.4961 ,6.35],
+                    maxXYZ: [-0.5848 ,0.87055 ,7.565]
+                },
+                {
+                    minXYZ: [-0.4453 ,-0.6956 ,6.35],
+                    maxXYZ: [0.3797 ,-0.6356 ,7.565]
+                },
+                {
+                    minXYZ: [0.4297 ,-0.6956 ,6.35],
+                    maxXYZ: [2.3797 ,-0.6356 ,7.565]
+                }]
+            const scaleArray = [];
+            for (let i = 0; i < instancesBoundsObj.length; i++) {
+                const instanceBounds = instancesBoundsObj[i];
+                let scale = new Cartesian3(
+                    instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
+                    instanceBounds.maxXYZ[0] - instanceBounds.minXYZ[0],
+                    instanceBounds.maxXYZ[2] - instanceBounds.minXYZ[2]);
+                const matrix4 = Matrix4.fromColumnMajorArray(instancesplacementArray[i]);
+                const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
+                let rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
+                rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
+                /*const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
+                const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
+                const angle = Quaternion.computeAngle(quaternion);
+                const angle_degree = CesiumMath.toDegrees(angle);*/
+
+                const up = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
+                if(i === 2 || i===3 || i === 4){
+                    debugger
+                    scale = new Cartesian3(scale.y,scale.x,scale.z);
+                    // scale = new Cartesian3(scale)
+                }
+                scaleArray.push(up);
+            }
+            const instancesLength = instancesplacementArray.length;
             const featureTableJson: any = {};
             featureTableJson.INSTANCES_LENGTH = instancesLength;
 
@@ -863,6 +941,12 @@ function createI3dmTile(options) {
             } else if (eastNorthUp) {
                 featureTableJson.EAST_NORTH_UP = true;
             }
+
+            const nonUniformScales = true;
+            if (nonUniformScales) {
+                attributes.push(getNonUniformScales(scaleArray));
+            }
+
             const batchIds = true;
             if (batchIds) {
                 attributes.push(getBatchIds(instancesLength));
@@ -955,7 +1039,23 @@ function getBatchIds(instancesLength: number) {
         byteAlignment: byteAlignment
     };
 }
-let right;
+
+function getNonUniformScales(scaleArray) {
+    const instancesLength = scaleArray.length;
+    const buffer = Buffer.alloc(instancesLength * 3 * FLOAT32_SIZE_BYTES);
+    for (let i = 0; i < instancesLength; ++i) {
+        const scale = scaleArray[i];
+        buffer.writeFloatLE(scale.x, i * 3 * FLOAT32_SIZE_BYTES);
+        buffer.writeFloatLE(scale.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
+        buffer.writeFloatLE(scale.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
+    }
+    return {
+        buffer: buffer,
+        propertyName: 'SCALE_NON_UNIFORM',
+        byteAlignment: FLOAT32_SIZE_BYTES
+    };
+}
+
 function getNormal(instancesplacement) {
     const matrix4 = Matrix4.fromColumnMajorArray(instancesplacement);
     const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
@@ -964,25 +1064,16 @@ function getNormal(instancesplacement) {
     const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
     const angle = Quaternion.computeAngle(quaternion);
     const angle_degree = CesiumMath.toDegrees(angle);
-    debugger
-    /*const x = CesiumMath.nextRandomNumber();
-    const y = CesiumMath.nextRandomNumber();
-    const z = CesiumMath.nextRandomNumber();
 
-    const normal = new Cartesian3(x, y, z);*/
-    // const normal = axis;
-    var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
-    var zUpRotation90 = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, 0 - CesiumMath.PI_OVER_TWO);
-    const matrix3_yz = Matrix3.fromQuaternion(yUpToZUp);
-    const matrix3_zup = Matrix3.fromQuaternion(zUpRotation90);
-    let rotation = Matrix3.multiply(matrix3_yz,rotation_mat3,new Matrix3());
-    // rotation = Matrix3.multiply(matrix3_zup,rotation,new Matrix3());
     const up = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(0,1,0),new Cartesian3());
-    right = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(1,0,0),new Cartesian3());
+    const right = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(1,0,0),new Cartesian3());
 
     const normal = up;//new Cartesian3(0,-1,0);
     Cartesian3.normalize(normal, normal);
-    return normal;
+    return {
+        up:Cartesian3.normalize(up, up),
+        right:Cartesian3.normalize(right,right)
+    };
 }
 
 function generateRandomNormal() {
@@ -996,11 +1087,11 @@ function generateRandomNormal() {
 }
 
 function getOrthogonalNormal(normal) {
-    /*const randomNormal = generateRandomNormal();
+    const randomNormal = generateRandomNormal();
     const orthogonal = Cartesian3.cross(normal, randomNormal, randomNormal);
-    return Cartesian3.normalize(orthogonal, orthogonal);*/
-    const orthogonal = right;//new Cartesian3(-1,0,0);
     return Cartesian3.normalize(orthogonal, orthogonal);
+    /*const orthogonal = right;//new Cartesian3(-1,0,0);
+    return Cartesian3.normalize(orthogonal, orthogonal);*/
 }
 
 function getOrientations(instancesplacementArray) {
@@ -1012,12 +1103,16 @@ function getOrientations(instancesplacementArray) {
         instancesLength * 3 * FLOAT32_SIZE_BYTES
     );
     for (let i = 0; i < instancesLength; ++i) {
-        const normalUp = getNormal(instancesplacementArray[i]);
+        if(i=== 3){
+            debugger
+        }
+        const normalObj = getNormal(instancesplacementArray[i]);
+        const normalUp = normalObj.up;
         normalsUpBuffer.writeFloatLE(normalUp.x, i * 3 * FLOAT32_SIZE_BYTES);
         normalsUpBuffer.writeFloatLE(normalUp.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
         normalsUpBuffer.writeFloatLE(normalUp.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
 
-        const normalRight = getOrthogonalNormal(normalUp);
+        const normalRight = normalObj.right;
         normalsRightBuffer.writeFloatLE(normalRight.x, i * 3 * FLOAT32_SIZE_BYTES);
         normalsRightBuffer.writeFloatLE(normalRight.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
         normalsRightBuffer.writeFloatLE(normalRight.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
@@ -1687,615 +1782,3 @@ function createInstances11(noParents, multipleParents,count,urls) {
     return instanceArray;
 }
 
-function createInstances22(noParents, multipleParents) {
-    var door0: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door0',
-                door_width: 1.2,
-                door_mass: 10
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door1: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door1',
-                door_width: 1.3,
-                door_mass: 11
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door2: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door2',
-                door_width: 1.21,
-                door_mass: 14
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door3: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door3',
-                door_width: 1.5,
-                door_mass: 7
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door4: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door4',
-                door_width: 1.1,
-                door_mass: 8
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door5: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door5',
-                door_width: 1.15,
-                door_mass: 12
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door6: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door6',
-                door_width: 1.32,
-                door_mass: 3
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door7: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door7',
-                door_width: 1.54,
-                door_mass: 6
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door8: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door8',
-                door_width: 1.8,
-                door_mass: 3
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door9: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door9',
-                door_width: 2.0,
-                door_mass: 5
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door10: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door10',
-                door_width: 2.1,
-                door_mass: 9
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var door11: any = {
-        instance: {
-            className: 'door',
-            properties: {
-                door_name: 'door11',
-                door_width: 1.3,
-                door_mass: 10
-            }
-        },
-        properties: {
-            height: 5.0,
-            area: 10.0
-        }
-    };
-    var doorknob0: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob0',
-                doorknob_size: 0.3
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob1: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob1',
-                doorknob_size: 0.43
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob2: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob2',
-                doorknob_size: 0.32
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob3: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob3',
-                doorknob_size: 0.2
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob4: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob4',
-                doorknob_size: 0.21
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob5: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob5',
-                doorknob_size: 0.35
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob6: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob6',
-                doorknob_size: 0.3
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob7: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob7',
-                doorknob_size: 0.23
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob8: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob8',
-                doorknob_size: 0.43
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob9: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob9',
-                doorknob_size: 0.32
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob10: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob10',
-                doorknob_size: 0.41
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var doorknob11: any = {
-        instance: {
-            className: 'doorknob',
-            properties: {
-                doorknob_name: 'doorknob11',
-                doorknob_size: 0.33
-            }
-        },
-        properties: {
-            height: 0.1,
-            area: 0.2
-        }
-    };
-    var roof0: any = {
-        instance: {
-            className: 'roof',
-            properties: {
-                roof_name: 'roof0',
-                roof_paint: 'red'
-            }
-        },
-        properties: {
-            height: 6.0,
-            area: 12.0
-        }
-    };
-    var roof1: any = {
-        instance: {
-            className: 'roof',
-            properties: {
-                roof_name: 'roof1',
-                roof_paint: 'blue'
-            }
-        },
-        properties: {
-            height: 6.0,
-            area: 12.0
-        }
-    };
-    var roof2: any = {
-        instance: {
-            className: 'roof',
-            properties: {
-                roof_name: 'roof2',
-                roof_paint: 'yellow'
-            }
-        },
-        properties: {
-            height: 6.0,
-            area: 12.0
-        }
-    };
-    var wall0: any = {
-        instance: {
-            className: 'wall',
-            properties: {
-                wall_name: 'wall0',
-                wall_paint: 'pink',
-                wall_windows: 1
-            }
-        },
-        properties: {
-            height: 10.0,
-            area: 20.0
-        }
-    };
-    var wall1: any = {
-        instance: {
-            className: 'wall',
-            properties: {
-                wall_name: 'wall1',
-                wall_paint: 'orange',
-                wall_windows: 2
-            }
-        },
-        properties: {
-            height: 10.0,
-            area: 20.0
-        }
-    };
-    var wall2: any = {
-        instance: {
-            className: 'wall',
-            properties: {
-                wall_name: 'wall2',
-                wall_paint: 'blue',
-                wall_windows: 4
-            }
-        },
-        properties: {
-            height: 10.0,
-            area: 20.0
-        }
-    };
-    var building0: any = {
-        instance: {
-            className: 'building',
-            properties: {
-                building_name: 'building0',
-                building_area: 20.0
-            }
-        }
-    };
-    var building1: any = {
-        instance: {
-            className: 'building',
-            properties: {
-                building_name: 'building1',
-                building_area: 21.98
-            }
-        }
-    };
-    var building2: any = {
-        instance: {
-            className: 'building',
-            properties: {
-                building_name: 'building2',
-                building_area: 39.3
-            }
-        }
-    };
-    var zone0: any = {
-        instance: {
-            className: 'zone',
-            properties: {
-                zone_name: 'zone0',
-                zone_buildings: 3
-            }
-        }
-    };
-    var classifierNew: any = {
-        instance: {
-            className: 'classifier_new',
-            properties: {
-                year: 2000,
-                color: 'red',
-                name: 'project',
-                architect: 'architect'
-            }
-        }
-    };
-    var classifierOld: any = {
-        instance: {
-            className: 'classifier_old',
-            properties: {
-                description: 'built in 1980',
-                inspection: 2009
-            }
-        }
-    };
-
-    if (noParents) {
-        return [
-            doorknob0,
-            doorknob1,
-            doorknob2,
-            doorknob3,
-            door0,
-            door1,
-            door2,
-            door3,
-            roof0,
-            wall0,
-            doorknob4,
-            doorknob5,
-            doorknob6,
-            doorknob7,
-            door4,
-            door5,
-            door6,
-            door7,
-            roof1,
-            wall1,
-            doorknob8,
-            doorknob9,
-            doorknob10,
-            doorknob11,
-            door8,
-            door9,
-            door10,
-            door11,
-            roof2,
-            wall2
-        ];
-    }
-    door0.instance.parents = [building0];
-    door1.instance.parents = [building0];
-    door2.instance.parents = [building0];
-    door3.instance.parents = [building0];
-    door4.instance.parents = [building1];
-    door5.instance.parents = [building1];
-    door6.instance.parents = [building1];
-    door7.instance.parents = [building1];
-    door8.instance.parents = [building2];
-    door9.instance.parents = [building2];
-    door10.instance.parents = [building2];
-    door11.instance.parents = [building2];
-    doorknob0.instance.parents = [door0];
-    doorknob1.instance.parents = [door1];
-    doorknob2.instance.parents = [door2];
-    doorknob3.instance.parents = [door3];
-    doorknob4.instance.parents = [door4];
-    doorknob5.instance.parents = [door5];
-    doorknob6.instance.parents = [door6];
-    doorknob7.instance.parents = [door7];
-    doorknob8.instance.parents = [door8];
-    doorknob9.instance.parents = [door9];
-    doorknob10.instance.parents = [door10];
-    doorknob11.instance.parents = [door11];
-    roof0.instance.parents = [building0];
-    roof1.instance.parents = [building1];
-    roof2.instance.parents = [building2];
-    wall0.instance.parents = [building0];
-    wall1.instance.parents = [building1];
-    wall2.instance.parents = [building2];
-    building0.instance.parents = [zone0];
-    building1.instance.parents = [zone0];
-    building2.instance.parents = [zone0];
-
-    if (multipleParents) {
-        door0.instance.parents.push(classifierOld);
-        building0.instance.parents.push(classifierNew);
-        building1.instance.parents.push(classifierOld);
-        building2.instance.parents.push(classifierNew, classifierOld);
-        return [
-            doorknob0,
-            doorknob1,
-            doorknob2,
-            doorknob3,
-            door0,
-            door1,
-            door2,
-            door3,
-            roof0,
-            wall0,
-            doorknob4,
-            doorknob5,
-            doorknob6,
-            doorknob7,
-            door4,
-            door5,
-            door6,
-            door7,
-            roof1,
-            wall1,
-            doorknob8,
-            doorknob9,
-            doorknob10,
-            doorknob11,
-            door8,
-            door9,
-            door10,
-            door11,
-            roof2,
-            wall2,
-            building0,
-            building1,
-            building2,
-            zone0,
-            classifierNew,
-            classifierOld
-        ];
-    }
-    return [
-        doorknob0,
-        doorknob1,
-        doorknob2,
-        doorknob3,
-        door0,
-        door1,
-        door2,
-        door3,
-        roof0,
-        wall0,
-        doorknob4,
-        doorknob5,
-        doorknob6,
-        doorknob7,
-        door4,
-        door5,
-        door6,
-        door7,
-        roof1,
-        wall1,
-        doorknob8,
-        doorknob9,
-        doorknob10,
-        doorknob11,
-        door8,
-        door9,
-        door10,
-        door11,
-        roof2,
-        wall2,
-        building0,
-        building1,
-        building2,
-        zone0
-    ];
-}
