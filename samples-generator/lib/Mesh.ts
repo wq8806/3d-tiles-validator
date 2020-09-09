@@ -416,6 +416,7 @@ export class Mesh {
      * glTFs like those in the data folder.
      *
      * @param {Object} gltf The glTF.
+     * @param {boolean} useVertexColor whether use vertex color
      * @returns {Mesh} The mesh.
      */
     static fromGltf(gltf: Gltf, useVertexColor:boolean = false): Mesh {
@@ -535,6 +536,27 @@ export class Mesh {
             gltfHasUint32indeces
         );
     };
+
+    static isSameI3dm(mesh1,mesh2): boolean{
+        const views1 = mesh1.views;
+        const views2 = mesh2.views;
+        if(views1.length === views2.length){
+            const compareLabel = new Array(views1.length).fill(0);
+            for (let i = 0; i < views1.length; i++) {
+                const view1_temp = views1[i];
+                for (let j = 0; j < views2.length; j++) {
+                    if(isSameMeshView(view1_temp,views2[j])){
+                        compareLabel[i] = 1;
+                        break;
+                    }
+                }
+            }
+            if(compareLabel.indexOf(0) === -1){
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 function getAccessor(gltf, accessor) {
@@ -581,12 +603,14 @@ function getSameMaterial(views,view) {
     }
     return null;
 }
-function isSameMaterialView(view1,view2){
+function isSameMeshView(view1,view2){
 
-    if(view1.material.baseColor[0] === view2.material.baseColor[0] &&
+    if (view1.indexCount === view2.indexCount &&
+        view1.material.baseColor[0] === view2.material.baseColor[0] &&
         view1.material.baseColor[1] === view2.material.baseColor[1] &&
         view1.material.baseColor[2] === view2.material.baseColor[2] &&
-        view1.material.baseColor[3] === view2.material.baseColor[3]){
+        view1.material.baseColor[3] === view2.material.baseColor[3] &&
+        view1.material.alphaMode === view2.material.alphaMode) {
         return true;
     }
 

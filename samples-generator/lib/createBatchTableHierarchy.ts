@@ -38,7 +38,7 @@ var getBufferPadded = require('./getBufferPadded');
 var saveBinary = require('./saveBinary');
 var saveJson = require('./saveJson');
 // add own dependency
-import { readXml,Bounds} from "./readXml";
+import { readXml,ElementInfo} from "./readXml";
 var readGltfNames = require('./readGltfNames');
 var math_ds = require('math-ds');
 var PointOctree = require('sparse-octree');
@@ -70,6 +70,7 @@ var whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
  * @returns {Promise} A promise that resolves when the tileset is saved.
  */
 let buildStoreyMap;
+let xmlJson;
 export function createBatchTableHierarchy(options) {
     var use3dTilesNext = defaultValue(options.use3dTilesNext, false);
     var useGlb = defaultValue(options.useGlb, false);
@@ -81,13 +82,14 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/openhouse/";
+    var directoryPath = "../data/bim/sample_all/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
-        const xmlJson = value.xmlJson;
-        buildStoreyMap = createStoreyMap(xmlJson);
+        // const xmlJson = value.xmlJson;
+        xmlJson = value.xmlJson;
+        // buildStoreyMap = createStoreyMap(xmlJson);
         options.xmlJson = xmlJson;
-        const xmlMap:Map<String,Bounds> = value.boundingInfoMap;
+        const xmlMap:Map<String,ElementInfo> = value.elementInfoMap;
         // console.log(xmlMap);
         options.xmlMap = xmlMap;
         var rootbounds;
@@ -104,14 +106,6 @@ export function createBatchTableHierarchy(options) {
                 break;
             }
         }*/
-
-        /* 测试代码
-        var rootboundsStr = "{\"center\":{\"x\":52.0585,\"y\":5.3283000000000005,\"z\":-22.48245},\"dimensions\":{\"x\":319.065,\"y\":14.3142,\"z\":151.7627},\"minXYZ\":[-107.47399999999999,-1.8287999999999993,-98.3638],\"maxXYZ\":[211.591,12.4854,53.3989]}";  //IfcProject(IfcSite)的Bounds
-        rootbounds = JSON.parse(rootboundsStr);
-        //IfcBuilding的包围盒
-        var buildingboundsStr = "{\"center\":{\"x\":23.912799999999997,\"y\":5.6331,\"z\":-11.093300000000001},\"dimensions\":{\"x\":83.9766,\"y\":13.704600000000001,\"z\":84.7206},\"minXYZ\":[-18.075500000000005,-1.2192000000000007,-53.4536],\"maxXYZ\":[65.9011,12.4854,31.267000000000003]}";
-        buildingbounds = JSON.parse(buildingboundsStr);
-        console.log(buildingbounds);*/
 
         readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
             //es6 模式下使用
@@ -152,7 +146,7 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
             return createI3dmTile(options);
-            return ;
+
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
                 gltfMap.forEach((value,key) =>{
@@ -294,7 +288,7 @@ export function createBatchTableHierarchy(options) {
                 console.error(e);
             }
 
-            //createB3dmTile11(options);
+            // return createB3dmTile11(options);
             try {
                 var promiseArr = createB3DMTask(options,tilesetJson.root.children,undefined);
                 saveJson(tilesetJsonPath, tilesetJson, options.prettyJson);
@@ -578,14 +572,14 @@ function createB3dmTile11(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_all/name.txt", 'utf-8', function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_door/name.txt", 'utf-8', function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_all/'+value);
+                urls.push('../data/bim/sample_door/'+value);
             })
 
             var instances = createInstances11(noParents, multipleParents,urls.length,urls);
@@ -710,7 +704,7 @@ function createB3dmTile11(options) {
 
             }).then(function(glb) {
                 console.log(glb);
-                //return saveBinary(tilePath, glb, options.gzip)
+                return saveBinary(tilePath, glb, options.gzip)
                 var b3dm = createB3dm({
                     glb : glb,
                     featureTableJson : featureTableJson,
@@ -736,14 +730,14 @@ function createI3dmTile(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_i3dm/name.txt", 'utf-8', async function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_door/name.txt", 'utf-8', async function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_i3dm/'+value);
+                urls.push('../data/bim/sample_door/'+value);
             })
 
             var instances = createInstances11(noParents, multipleParents,urls.length,urls);
@@ -817,10 +811,22 @@ function createI3dmTile(options) {
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
             //对应下方的模板信息进行更改
-            let gltf = await getGltfFromGlbUri(urls[3],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+            let gltf = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
                 {
                     resourceDirectory : urls[0]
                 });
+            /*let gltf1 = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+                {
+                    resourceDirectory : urls[0]
+                });
+            const mesh1 = Mesh.fromGltf(gltf1);
+            let gltf2 = await getGltfFromGlbUri(urls[3],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+                {
+                    resourceDirectory : urls[0]
+                });
+            const mesh2 = Mesh.fromGltf(gltf2);
+            const same = Mesh.isSameI3dm(mesh1,mesh2);*/
+
             debugger
            /* const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1] //07hc1aZW98debjzrL5HoR4 第二排第四个
             const boundsobj = {
@@ -828,10 +834,10 @@ function createI3dmTile(options) {
                 maxXYZ : [-0.5848 ,18.8705 ,7.565]
             }*/
 
-            const placementArray = [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
+            const placementArray = [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,15.0955 ,0 ,1]//[1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
             const boundsobj = {
-                    minXYZ: [-0.4453 ,-0.6956 ,6.35],
-                    maxXYZ: [0.3797 ,-0.6356 ,7.565]
+                    minXYZ: [7.5912 ,15.0195 ,0],
+                    maxXYZ: [7.7797 ,16.0865 ,2.21]
                 }
             const x_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
             const y_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
@@ -878,7 +884,7 @@ function createI3dmTile(options) {
                 //useBatchIds : false
             });*/
             // return saveBinary(tilePath, template, options.gzip);
-            const instancesplacementArray = [
+            /*const instancesplacementArray = [
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1],
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,0.187225 ,6.350 ,1],//边角
@@ -905,7 +911,26 @@ function createI3dmTile(options) {
                 {
                     minXYZ: [0.4297 ,-0.6956 ,6.35],
                     maxXYZ: [2.3797 ,-0.6356 ,7.565]
-                }]
+                }]*/
+            const instancesplacementArray = [
+                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,15.0955 ,0 ,1],
+                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,12.8655 ,0 ,1],
+                [-1 ,0 ,0 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,1 ,0 ,18.4456 ,44.9596 ,7.600 ,1]
+            ];
+            const instancesBoundsObj = [
+                {
+                    minXYZ: [7.5912 ,15.0195 ,0],
+                    maxXYZ: [7.7797 ,16.0865 ,2.21]
+                },
+                {
+                    minXYZ: [7.5912 ,12.7895 ,0],
+                    maxXYZ: [7.7797 ,14.7715 ,2.21]
+                },
+                {
+                    minXYZ: [16.6396 ,44.7961 ,7.6],
+                    maxXYZ: [18.5216 ,44.9846 ,9.81]
+                }
+            ];
             const scaleArray = [];
             for (let i = 0; i < instancesBoundsObj.length; i++) {
                 const instanceBounds = instancesBoundsObj[i];
@@ -920,24 +945,6 @@ function createI3dmTile(options) {
 
                 let up = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
                 up = Cartesian3.abs(up,up);
-                if(i===2){
-                    debugger
-                    console.log(scale);
-                    //scale {
-                    //   "x": 1.36665,
-                    //   "y": 0.06000000000000005,
-                    //   "z": 1.2150000000000007
-                    // }
-                }
-                if(i===3 || i === 4){
-                    debugger
-                    scale = new Cartesian3(scale.y,scale.x,scale.z);
-                    // 3 scale {
-                    //   "x": 0.825,
-                    //   "y": 0.05999999999999994,
-                    //   "z": 1.2150000000000007
-                    // }
-                }
                 scaleArray.push(up);
             }
             const instancesLength = instancesplacementArray.length;
@@ -957,7 +964,7 @@ function createI3dmTile(options) {
                 featureTableJson.EAST_NORTH_UP = true;
             }
 
-            const nonUniformScales = true;
+            const nonUniformScales = false;   //缩放只适合于单一材质模型，两种及以上材质模型缩放需要按primitive来
             if (nonUniformScales) {
                 attributes.push(getNonUniformScales(scaleArray));
             }
@@ -1732,17 +1739,17 @@ function createInstances(noParents, multipleParents,count,urls,xmlJson) {
             }*/
         }
         var instance = {
-            instance : {
+            /*instance : {
                 className : className,//propertyArray[i].join("--"),
                 properties : {
                     guid : propertyArray[i][0],
                     ifc_type : propertyArray[i][1]
                 }
-            },
-            /*properties : {
+            },*/
+            properties : {
                 guid : propertyArray[i][0],
                 ifc_type : propertyArray[i][1]
-            }*/
+            }
         };
         instanceArray.push(instance);
     }
