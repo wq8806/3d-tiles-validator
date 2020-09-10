@@ -73,16 +73,8 @@ function traverseJson(obj,map) {
                 if(obj[key]['attr'].hasOwnProperty("ObjectPlacement")){
                     placementStr = obj[key]['attr']['ObjectPlacement'];
                 }
-                let materialStr = "";
-                if(obj[key].hasOwnProperty('IfcMaterialLayerSetUsage')){
-                    materialStr = obj[key]['IfcMaterialLayerSetUsage']['attr']['xlink:href'];
-                }else if(obj[key].hasOwnProperty('IfcMaterial')){
-                    materialStr = obj[key]['IfcMaterial']['attr']['xlink:href'];
-                }else if(obj[key].hasOwnProperty('IfcMaterialList')){
-                    materialStr = obj[key]['IfcMaterialList']['attr']['xlink:href'];
-                }
 
-                map.set(obj[key]['attr']['id'] + "--" + key +".glb",computeAABB(minXYZStr,maxSYXStr,placementStr,materialStr));
+                map.set(obj[key]['attr']['id'] + "--" + key +".glb",computeAABB(minXYZStr,maxSYXStr,placementStr));
                 var objA = obj[key];
                 traverseJson(objA,map);
             }else if(obj[key] instanceof Array){
@@ -111,10 +103,9 @@ export class ElementInfo {
     minXYZ: number[] = [];
     maxXYZ: number[] = [];
     objectPlacement: number[] = [];
-    material: undefined | string = undefined;
 }
 
-function computeAABB(minXYZStr,maxXYZStr,placementStr,materialStr) {
+function computeAABB(minXYZStr,maxXYZStr,placementStr) {
     let elementInfo:ElementInfo = new ElementInfo();
     var minXYZ = minXYZStr.split(' ');
     var maxXYZ = maxXYZStr.split(' ');
@@ -166,11 +157,6 @@ function computeAABB(minXYZStr,maxXYZStr,placementStr,materialStr) {
         placement[15] *= 1;
     }
     elementInfo.objectPlacement = placement;
-
-    let material = undefined;
-    if(materialStr !== ""){
-        material = materialStr;
-    }
-    elementInfo.material = material;
+    
     return elementInfo;
 }
