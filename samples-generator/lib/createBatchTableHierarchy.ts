@@ -46,6 +46,7 @@ import {JSONPath} from 'jsonpath-plus';
 import {generateInstancesBatchTable} from "./createInstancesTile";
 import {FLOAT32_SIZE_BYTES, UINT16_SIZE_BYTES, UINT32_SIZE_BYTES, UINT8_SIZE_BYTES} from "./typeSize";
 const createI3dm = require('./createI3dm');
+import { ReOrganizeModel } from './ReOrganizeModel';
 
 var sizeOfFloat = 4;
 var sizeOfUint16 = 2;
@@ -87,7 +88,7 @@ export function createBatchTableHierarchy(options) {
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         // const xmlJson = value.xmlJson;
         xmlJson = value.xmlJson;
-        // buildStoreyMap = createStoreyMap(xmlJson);
+        buildStoreyMap = createStoreyMap(xmlJson);
         options.xmlJson = xmlJson;
         const xmlMap:Map<String,ElementInfo> = value.elementInfoMap;
         // console.log(xmlMap);
@@ -107,7 +108,7 @@ export function createBatchTableHierarchy(options) {
             }
         }*/
 
-        readGltfNames({directoryPath:directoryPath}).then(function (gltfMap) {
+        readGltfNames({directoryPath:directoryPath}).then(async function (gltfMap) {
             //es6 模式下使用
             /*for(var [key, value] of gltfMap){
                 gltfMap.set(key,xmlMap.get(key));
@@ -125,11 +126,28 @@ export function createBatchTableHierarchy(options) {
             var directory = options.directory;
             var tilesetJsonPath = path.join(directory, 'tileset.json');
 
+            /*const placement = [0.798636 ,0.601815 ,0 ,0 ,-0.601815 ,0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-19.8236 ,-18.8083 ,0 ,1];
+            const matrix4 = Matrix4.fromColumnMajorArray(placement);
+            const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
+            const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
+
+            let c1 = new Cartesian3(rootbounds.dimensions.x / 2, 0 , 0);
+            c1 = Matrix3.multiplyByVector(rotation_mat3,c1,new Cartesian3());
+            let c2 = new Cartesian3(0 , rootbounds.dimensions.y / 2,0);
+            c2 = Matrix3.multiplyByVector(rotation_mat3,c2,new Cartesian3());
+            let c3 = new Cartesian3(0 , 0 , rootbounds.dimensions.z / 2);
+            c3 = Matrix3.multiplyByVector(rotation_mat3,c3,new Cartesian3());
             var box = [
-                rootbounds.center.z , rootbounds.center.x , rootbounds.center.y,
-                rootbounds.dimensions.z / 2, 0 , 0,
-                0 , rootbounds.dimensions.x / 2,0,
-                0 , 0 , rootbounds.dimensions.y / 2
+                rootbounds.center.x , rootbounds.center.y , rootbounds.center.z,
+                c1.x, c1.y, c1.z,
+                c2.x, c2.y, c2.z,
+                c3.x, c3.y, c3.z,];
+            //3dTiles中是OBB,而非AABB，可以将向量进行旋转实现*/
+            var box = [
+                rootbounds.center.x , rootbounds.center.y , rootbounds.center.z,
+                rootbounds.dimensions.x / 2, 0 , 0,
+                0 , rootbounds.dimensions.y / 2,0,
+                0 , 0 , rootbounds.dimensions.z / 2
             ];
             var geometricError = computeSSE(rootbounds);
 
@@ -145,7 +163,8 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            return createI3dmTile(options);
+            /*const testi3dm = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
+            return createI3dmTile(options);*/
 
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
@@ -189,15 +208,15 @@ export function createBatchTableHierarchy(options) {
                     zArr.push(value.center.y);
                     centerPoints.push(new math_ds.Vector3(value.center.z,value.center.x,value.center.y));
                 });
-                /*const rootbox = new math_ds.Box3(
+                const rootbox = new math_ds.Box3(
                     new math_ds.Vector3(Math.min.apply(null,xArr),Math.min.apply(null,yArr),Math.min.apply(null,zArr)),
                     new math_ds.Vector3(Math.max.apply(null,xArr),Math.max.apply(null,yArr),Math.max.apply(null,zArr))
-                );*/
+                );
 
-                var rootbox = new math_ds.Box3(
+                /*var rootbox = new math_ds.Box3(
                     new math_ds.Vector3(rootbounds.minXYZ[2],rootbounds.minXYZ[0],rootbounds.minXYZ[1]),
                     new math_ds.Vector3(rootbounds.maxXYZ[2],rootbounds.maxXYZ[0],rootbounds.maxXYZ[1])
-                );
+                );*/
                 //console.log(box);
                 /**
                  * Constructs a new point octree.  constructor(min, max, bias = 0.0, maxPoints = 8, maxDepth = 8)
@@ -299,6 +318,8 @@ export function createBatchTableHierarchy(options) {
                         saveBinary(tilePath, results[i]["b3dm"], options.gzip)
                     }
                     console.log("done");
+                }).catch(error => {
+                    console.error(error);
                 })
             }catch (e) {
                 console.error(e)
@@ -572,14 +593,14 @@ function createB3dmTile11(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_door/name.txt", 'utf-8', function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_i3dm/name.txt", 'utf-8', function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_door/'+value);
+                urls.push('../data/bim/sample_i3dm/'+value);
             })
 
             var instances = createInstances11(noParents, multipleParents,urls.length,urls);
@@ -730,14 +751,14 @@ function createI3dmTile(options) {
 
     // Mesh urls listed in the same order as features in the classIds arrays
     var urls = [];
-    return fsExtra.readFile("../data/bim/sample_door/name.txt", 'utf-8', async function (err,data) {
+    return fsExtra.readFile("../data/bim/sample_i3dm/name.txt", 'utf-8', async function (err,data) {
         if(err){
             console.error(err);
         }
         else{
             var str_array = data.split(",");
             str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_door/'+value);
+                urls.push('../data/bim/sample_i3dm/'+value);
             })
 
             var instances = createInstances11(noParents, multipleParents,urls.length,urls);
@@ -815,17 +836,17 @@ function createI3dmTile(options) {
                 {
                     resourceDirectory : urls[0]
                 });
-            /*let gltf1 = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+            let gltf1 = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
                 {
                     resourceDirectory : urls[0]
                 });
             const mesh1 = Mesh.fromGltf(gltf1);
-            let gltf2 = await getGltfFromGlbUri(urls[3],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
+            let gltf2 = await getGltfFromGlbUri(urls[1],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
                 {
-                    resourceDirectory : urls[0]
+                    resourceDirectory : urls[1]
                 });
             const mesh2 = Mesh.fromGltf(gltf2);
-            const same = Mesh.isSameI3dm(mesh1,mesh2);*/
+            const same = Mesh.isSameI3dm(mesh1,mesh2);
 
             debugger
            /* const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1] //07hc1aZW98debjzrL5HoR4 第二排第四个
@@ -834,33 +855,39 @@ function createI3dmTile(options) {
                 maxXYZ : [-0.5848 ,18.8705 ,7.565]
             }*/
 
-            const placementArray = [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,15.0955 ,0 ,1]//[1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
+            const placementArray = [-0.798636 ,-0.601815 ,0 ,0 ,0.601815 ,-0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-20.2451 ,-21.2052 ,0 ,1]//[1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
             const boundsobj = {
-                    minXYZ: [7.5912 ,15.0195 ,0],
-                    maxXYZ: [7.7797 ,16.0865 ,2.21]
-                }
-            const x_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
-            const y_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
-            const z_length = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
-            console.log(x_length + "--" + y_length +"--" + z_length);
-            let scale_template = new Cartesian3(
-                1 / x_length,
-                1 / y_length,
-                1 / z_length);
-            let mat4 = Matrix4.fromColumnMajorArray(placementArray);
-            // mat4 = Matrix4.multiplyByScale(mat4,scale_template,mat4);
-            const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
-            const rotation_template = Matrix3.getRotation(mat3,mat3);
-            const rotation_template_inverse = Matrix3.inverse(rotation_template,new Matrix3());
-            scale_template = Matrix3.multiplyByVector(rotation_template_inverse,scale_template,scale_template);
-            // {
-            //   "x": 0.512820512820513,
-            //   "y": 16.666666666666654,
-            //   "z": 0.8230452674897114
-            // }
-            scale_template = Cartesian3.abs(scale_template,scale_template);
+                minXYZ: [-20.7728 ,-21.4226 ,-0.000609347],
+                maxXYZ: [-20.2461 ,-20.8932 ,0.775503]
+            }
 
-            const scaleMatrix = Matrix4.fromScale(scale_template);
+            let mat4 = Matrix4.fromColumnMajorArray(placementArray);
+
+            const needScale = false;
+            let scaleMatrix = Matrix4.IDENTITY;
+            if(needScale){
+                const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
+                const rotation_template = Matrix3.getRotation(mat3,mat3);
+                const rotation_template_inverse = Matrix3.inverse(rotation_template,new Matrix3());
+
+                const x_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
+                const y_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
+                const z_length = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
+
+                let scale_template = new Cartesian3(
+                    1 / x_length,
+                    1 / y_length,
+                    1 / z_length);
+                scale_template = Matrix3.multiplyByVector(rotation_template_inverse,scale_template,scale_template);
+                // {
+                //   "x": 0.512820512820513,
+                //   "y": 16.666666666666654,
+                //   "z": 0.8230452674897114
+                // }
+                scale_template = Cartesian3.abs(scale_template,scale_template);
+                scaleMatrix = Matrix4.fromScale(scale_template);
+            }
+
             let inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
             inverse_mat4 = Matrix4.multiply(scaleMatrix,inverse_mat4,inverse_mat4);
             // const scale1 = Matrix4.getScale(inverse_mat4,new Cartesian3());
@@ -869,14 +896,16 @@ function createI3dmTile(options) {
             const transformMesh = Mesh.clone(mesh);
             transformMesh.transform(inverse_mat4);
             const batchedMesh = Mesh.batch([transformMesh]);
-            const center = batchedMesh.center;
-            const center_negate = Cartesian3.negate(center,new Cartesian3());
-            const center_transform = Matrix4.fromTranslation(center_negate);
-            batchedMesh.transform(center_transform);
+            if(needScale){
+                const center = batchedMesh.center;
+                const center_negate = Cartesian3.negate(center, new Cartesian3());
+                const center_transform = Matrix4.fromTranslation(center_negate);
+                batchedMesh.transform(center_transform);
+            }
             const template = await createGltf({
                 mesh : batchedMesh,
-                compressDracoMeshes : false,
-                //useBatchIds : false
+                compressDracoMeshes : true,
+                useBatchIds : false
             });
             /*const template_glb = await createGlb({
                 mesh : batchedMesh,
@@ -884,6 +913,7 @@ function createI3dmTile(options) {
                 //useBatchIds : false
             });*/
             // return saveBinary(tilePath, template, options.gzip);
+            //Ifcplate
             /*const instancesplacementArray = [
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
                 [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1],
@@ -912,10 +942,11 @@ function createI3dmTile(options) {
                     minXYZ: [0.4297 ,-0.6956 ,6.35],
                     maxXYZ: [2.3797 ,-0.6356 ,7.565]
                 }]*/
-            const instancesplacementArray = [
+            //IfcDoor
+            /*const instancesplacementArray = [
                 [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,15.0955 ,0 ,1],
-                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,12.8655 ,0 ,1],
-                [-1 ,0 ,0 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,1 ,0 ,18.4456 ,44.9596 ,7.600 ,1]
+                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,19.0955 ,0 ,1],
+                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,14.1465 ,47.1741 ,3.800 ,1]
             ];
             const instancesBoundsObj = [
                 {
@@ -923,30 +954,28 @@ function createI3dmTile(options) {
                     maxXYZ: [7.7797 ,16.0865 ,2.21]
                 },
                 {
-                    minXYZ: [7.5912 ,12.7895 ,0],
-                    maxXYZ: [7.7797 ,14.7715 ,2.21]
+                    minXYZ: [7.5912 ,19.0195 ,0],
+                    maxXYZ: [7.7797 ,20.0865 ,2.21]
                 },
                 {
-                    minXYZ: [16.6396 ,44.7961 ,7.6],
-                    maxXYZ: [18.5216 ,44.9846 ,9.81]
+                    minXYZ: [14.0705 ,47.1491 ,3.8],
+                    maxXYZ: [15.1375 ,47.3376 ,6.01]
+                }
+            ];*/
+            const instancesplacementArray = [
+                [-0.798636 ,-0.601815 ,0 ,0 ,0.601815 ,-0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-20.2451 ,-21.2052 ,0 ,1],
+                [0.798636 ,0.601815 ,0 ,0 ,-0.601815 ,0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-21.9509 ,-21.4638 ,0 ,1]
+            ];
+            const instancesBoundsObj = [
+                {
+                    minXYZ: [-20.7728 ,-21.4226 ,-0.000609347],
+                    maxXYZ: [-20.2461 ,-20.8932 ,0.775503]
+                },
+                {
+                    minXYZ: [-22.1876 ,-21.462 ,-0.000609347],
+                    maxXYZ: [-21.6609 ,-20.9325 ,0.775503]
                 }
             ];
-            const scaleArray = [];
-            for (let i = 0; i < instancesBoundsObj.length; i++) {
-                const instanceBounds = instancesBoundsObj[i];
-                let scale = new Cartesian3(
-                    instanceBounds.maxXYZ[0] - instanceBounds.minXYZ[0],
-                    instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
-                    instanceBounds.maxXYZ[2] - instanceBounds.minXYZ[2]);
-                const matrix4 = Matrix4.fromColumnMajorArray(instancesplacementArray[i]);
-                const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
-                let rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
-                // rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
-
-                let up = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
-                up = Cartesian3.abs(up,up);
-                scaleArray.push(up);
-            }
             const instancesLength = instancesplacementArray.length;
             const featureTableJson: any = {};
             featureTableJson.INSTANCES_LENGTH = instancesLength;
@@ -964,8 +993,25 @@ function createI3dmTile(options) {
                 featureTableJson.EAST_NORTH_UP = true;
             }
 
-            const nonUniformScales = false;   //缩放只适合于单一材质模型，两种及以上材质模型缩放需要按primitive来
+            const nonUniformScales = needScale;   //缩放只适合于单一材质模型，两种及以上材质模型缩放需要按primitive来
             if (nonUniformScales) {
+                const scaleArray = [];
+                for (let i = 0; i < instancesBoundsObj.length; i++) {
+                    const instanceBounds = instancesBoundsObj[i];
+                    let scale = new Cartesian3(
+                        instanceBounds.maxXYZ[0] - instanceBounds.minXYZ[0],
+                        instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
+                        instanceBounds.maxXYZ[2] - instanceBounds.minXYZ[2]);
+                    const matrix4 = Matrix4.fromColumnMajorArray(instancesplacementArray[i]);
+                    const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
+                    let rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
+                    // rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
+
+                    let rotateScale = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
+                    rotateScale = Cartesian3.abs(rotateScale,rotateScale);
+                    scaleArray.push(rotateScale);
+                }
+
                 attributes.push(getNonUniformScales(scaleArray));
             }
 
@@ -1209,10 +1255,10 @@ function computeOctantBoundingbox(minObj,maxobj) {
     dimensions["y"] = maxobj.y - minObj.y;
     dimensions["z"] = maxobj.z - minObj.z;
     var box = [
-        center["z"] , center["x"] , center["y"],
-        dimensions["z"] / 2, 0 , 0,
-        0 , dimensions["x"] / 2,0,
-        0 , 0 , dimensions["y"] / 2
+        center["x"] , center["y"] , center["z"],
+        dimensions["x"] / 2, 0 , 0,
+        0 , dimensions["y"] / 2,0,
+        0 , 0 , dimensions["z"] / 2
     ];
     boundingBox.box = box;
     return boundingBox;
@@ -1307,10 +1353,10 @@ function computeTile(ocantData,indicesArr) {
     dimensions["y"] = tileMaxXYZ[1] - tileMinXYZ[1];
     dimensions["z"] = tileMaxXYZ[2] - tileMinXYZ[2];
     var box = [
-        center["z"] , center["x"] , center["y"],
-        dimensions["z"] / 2, 0 , 0,
-        0 , dimensions["x"] / 2,0,
-        0 , 0 , dimensions["y"] / 2
+        center["x"] , center["y"] , center["z"],
+        dimensions["x"] / 2, 0 , 0,
+        0 , dimensions["y"] / 2,0,
+        0 , 0 , dimensions["z"] / 2
     ];
 
     var boundsCenter = new Cartesian3(center["x"],center["y"],center["z"]);
@@ -1739,17 +1785,17 @@ function createInstances(noParents, multipleParents,count,urls,xmlJson) {
             }*/
         }
         var instance = {
-            /*instance : {
+            instance : {
                 className : className,//propertyArray[i].join("--"),
                 properties : {
                     guid : propertyArray[i][0],
                     ifc_type : propertyArray[i][1]
                 }
-            },*/
-            properties : {
+            },
+            /*properties : {
                 guid : propertyArray[i][0],
                 ifc_type : propertyArray[i][1]
-            }
+            }*/
         };
         instanceArray.push(instance);
     }

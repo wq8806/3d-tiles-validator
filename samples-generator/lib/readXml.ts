@@ -4,7 +4,7 @@ var fsExtra = require('fs-extra');
 var fastXmlParser = require('fast-xml-parser');
 import {JSONPath} from 'jsonpath-plus';
 import {
-    Cartesian3,
+    Cartesian3 as CesiumCartesian3,
     defaultValue,
     defined,
     Math as CesiumMath,
@@ -13,7 +13,10 @@ import {
     Quaternion,
 } from 'cesium';
 
+let xmlJson;
 let lengthUnit = 0;
+let sitePlacementStr = "";
+let siteTranslation;
 export function readXml(options) {
     const derrered = Bluebird.defer();
     var directoryPath = options.directoryPath;
@@ -46,11 +49,15 @@ export function readXml(options) {
                 if(fastXmlParser.validate(result) === true){//optional
 
                     var jsonObj = fastXmlParser.parse(result,options);
+                    xmlJson = jsonObj;
+
                     const lengthObj = JSONPath({
                         path: "$..*[?(@.UnitType === 'LENGTHUNIT')]",
                         json:jsonObj.ifc.units
                     })[0];
                     lengthUnit = lengthObj.SI_equivalent;
+                    /*sitePlacementStr = jsonObj.ifc.decomposition.IfcProject.IfcSite['attr']['ObjectPlacement'];
+                    siteTranslation = getTranslation(sitePlacementStr);*/
                     var myMap = traverseJson(jsonObj.ifc.decomposition,undefined);
                     derrered.resolve({
                         xmlJson:jsonObj,
@@ -78,10 +85,8 @@ function traverseJson(obj,map) {
             if(obj[key].hasOwnProperty("attr") && obj[key]['attr'].hasOwnProperty("minXYZ")){
                 var minXYZStr = obj[key]['attr']['minXYZ'];
                 var maxSYXStr = obj[key]['attr']['maxXYZ'];
+
                 let placementStr = "";
-                if(key === "IfcProject"){ //不包含ObjectPlacement
-                    placementStr = obj[key]['IfcSite']['attr']['ObjectPlacement'];
-                }
                 if(obj[key]['attr'].hasOwnProperty("ObjectPlacement")){
                     placementStr = obj[key]['attr']['ObjectPlacement'];
                 }
@@ -103,11 +108,11 @@ function traverseJson(obj,map) {
     return map;
 }
 
-/*class Cartesian3 {
+class Cartesian3 {
     x:number = 0;
     y:number = 0;
     z:number = 0;
-};*/
+};
 
 export class ElementInfo {
     center: Cartesian3 = new Cartesian3();
@@ -121,11 +126,56 @@ function computeAABB(minXYZStr,maxXYZStr,placementStr) {
     let elementInfo:ElementInfo = new ElementInfo();
 
     //objectPlacement
-    let placement = [];
-    if(placementStr !== ""){
-        placement = placementStr.split(' ');
+    const placement = getMatrix4FromPlacement(placementStr);
+    elementInfo.objectPlacement = placement;
+
+    const matrix4 = Matrix4.fromColumnMajorArray(placement);
+    const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
+    const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
+    const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
+    const axis = Quaternion.computeAxis(quaternion,new CesiumCartesian3());
+    const angle = Quaternion.computeAngle(quaternion);
+    const angle_degree = CesiumMath.toDegrees(angle);
+
+    var minXYZ = minXYZStr.split(' ');
+    var maxXYZ = maxXYZStr.split(' ');
+    for (let i = 0; i < 3; i++) {
+        minXYZ[i] = Number(minXYZ[i]);
+        maxXYZ[i] = Number(maxXYZ[i]);
     }
-    if(placement.length === 16 && typeof lengthUnit === 'number'){
+    //Ifc中轴向与gltf有差异，但IfcOpenShell中minxyz，maxxyz已经是经过变换的世界坐标，3dtilesZ轴向上，加载该坐标是正确的轴向对齐的minxyz，maxxyz
+    let center:Cartesian3 = new Cartesian3();
+    /*center.x = (minXYZ[0] + maxXYZ[0]) / 2;
+    center.y = (minXYZ[2] + maxXYZ[2]) / 2;
+    center.z = 0 - (minXYZ[1] + maxXYZ[1]) / 2;
+    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;*/
+    center.x = (minXYZ[0] + maxXYZ[0]) / 2;
+    center.y = (minXYZ[1] + maxXYZ[1]) / 2;
+    center.z = (minXYZ[2] + maxXYZ[2]) / 2;
+
+    let dimensions:Cartesian3 = new Cartesian3();
+    /*dimensions.x = maxXYZ[0] - minXYZ[0];
+    dimensions.y = maxXYZ[2] - minXYZ[2];
+    dimensions.z = maxXYZ[1] - minXYZ[1];*/
+    dimensions.x = maxXYZ[0] - minXYZ[0];
+    dimensions.y = maxXYZ[1] - minXYZ[1];
+    dimensions.z = maxXYZ[2] - minXYZ[2];
+
+    elementInfo.center = center;
+    elementInfo.dimensions = dimensions;
+    /*bounds.minXYZ = minXYZ;
+    bounds.maxXYZ = maxXYZ;*/
+    elementInfo.minXYZ = [center.x - dimensions.x / 2 ,center.y - dimensions.y / 2, center.z - dimensions.z/2];
+    elementInfo.maxXYZ = [center.x + dimensions.x / 2 ,center.y + dimensions.y/2, center.z + dimensions.z/2];
+
+    return elementInfo;
+}
+
+function getMatrix4FromPlacement(placementStr) {
+    let placement;
+    if(placementStr !== "" && typeof lengthUnit === 'number'){
+        placement = placementStr.split(' ');
+
         placement[12] *= lengthUnit;
         placement[13] *= lengthUnit;
         placement[14] *= lengthUnit;
@@ -144,44 +194,15 @@ function computeAABB(minXYZStr,maxXYZStr,placementStr) {
         placement[11] *= 1;
 
         placement[15] *= 1;
+    }else {
+        const identity:Matrix4 = Matrix4.IDENTITY;
+        placement = Matrix4.toArray(identity);
     }
-    elementInfo.objectPlacement = placement;
-
-    //minXYZStr maxXYZStr 是轴向对齐的，未考虑旋转，revit示例不适用
-    let minXYZ = minXYZStr.split(' ');
-    let maxXYZ = maxXYZStr.split(' ');
-    for (let i = 0; i < 3; i++) {
-        minXYZ[i] = Number(minXYZ[i]);
-        maxXYZ[i] = Number(maxXYZ[i]);
-    }
-    minXYZ = new Cartesian3(minXYZ[0],minXYZ[1],minXYZ[2]);
-    maxXYZ = new Cartesian3(maxXYZ[0],maxXYZ[1],maxXYZ[2]);
-
-    const mat4 = Matrix4.fromColumnMajorArray(placement);
-    const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
-    const rotation = Matrix3.getRotation(mat3,mat3);
-    const rotation_inverse = Matrix3.inverse(rotation,new Matrix3());
-
-    minXYZ = Matrix3.multiplyByVector(rotation,minXYZ,minXYZ);
-    maxXYZ = Matrix3.multiplyByVector(rotation,maxXYZ,maxXYZ);
-
-    let center:Cartesian3 = new Cartesian3();
-    center.x = (minXYZ.x + maxXYZ.x) / 2;    //Ifc中轴向与gltf有差异
-    center.y = (minXYZ.z + maxXYZ.z) / 2;
-    center.z = 0 - (minXYZ.y + maxXYZ.y) / 2;
-    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
-
-    let dimensions:Cartesian3 = new Cartesian3();
-    dimensions.x = maxXYZ.x - minXYZ.x;
-    dimensions.y = maxXYZ.z - minXYZ.z;
-    dimensions.z = maxXYZ.y - minXYZ.y;
-
-    elementInfo.center = center;
-    elementInfo.dimensions = dimensions;
-    /*bounds.minXYZ = minXYZ;
-    bounds.maxXYZ = maxXYZ;*/
-    elementInfo.minXYZ = [center.x - dimensions.x / 2 ,center.y - dimensions.y / 2, center.z - dimensions.z/2];
-    elementInfo.maxXYZ = [center.x + dimensions.x / 2 ,center.y + dimensions.y/2, center.z + dimensions.z/2];
-
-    return elementInfo;
+    return placement;
+}
+function getTranslation(sitePlacementStr) {
+    const sitePlacement = getMatrix4FromPlacement(sitePlacementStr);
+    const mat4 = Matrix4.fromColumnMajorArray(sitePlacement);
+    const translation = Matrix4.getTranslation(mat4,new CesiumCartesian3());
+    return translation;
 }
