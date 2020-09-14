@@ -163,8 +163,8 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            /*const testi3dm = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
-            return createI3dmTile(options);*/
+            const testi3dm = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
+            return createI3dmTile(options);
 
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
@@ -1792,7 +1792,7 @@ function createInstances(noParents, multipleParents,count,urls,xmlJson) {
                     ifc_type : propertyArray[i][1]
                 }
             },
-            /*properties : {
+            /*properties : {    //为单个部件的属性
                 guid : propertyArray[i][0],
                 ifc_type : propertyArray[i][1]
             }*/

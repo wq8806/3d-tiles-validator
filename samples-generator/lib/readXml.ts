@@ -15,8 +15,7 @@ import {
 
 let xmlJson;
 let lengthUnit = 0;
-let sitePlacementStr = "";
-let siteTranslation;
+
 export function readXml(options) {
     const derrered = Bluebird.defer();
     var directoryPath = options.directoryPath;
@@ -56,8 +55,7 @@ export function readXml(options) {
                         json:jsonObj.ifc.units
                     })[0];
                     lengthUnit = lengthObj.SI_equivalent;
-                    /*sitePlacementStr = jsonObj.ifc.decomposition.IfcProject.IfcSite['attr']['ObjectPlacement'];
-                    siteTranslation = getTranslation(sitePlacementStr);*/
+
                     var myMap = traverseJson(jsonObj.ifc.decomposition,undefined);
                     derrered.resolve({
                         xmlJson:jsonObj,
@@ -144,6 +142,7 @@ function computeAABB(minXYZStr,maxXYZStr,placementStr) {
         maxXYZ[i] = Number(maxXYZ[i]);
     }
     //Ifc中轴向与gltf有差异，但IfcOpenShell中minxyz，maxxyz已经是经过变换的世界坐标，3dtilesZ轴向上，加载该坐标是正确的轴向对齐的minxyz，maxxyz
+    //xml中记录的minXYZ maxXYZ是包含子部件的边界框
     let center:Cartesian3 = new Cartesian3();
     /*center.x = (minXYZ[0] + maxXYZ[0]) / 2;
     center.y = (minXYZ[2] + maxXYZ[2]) / 2;
