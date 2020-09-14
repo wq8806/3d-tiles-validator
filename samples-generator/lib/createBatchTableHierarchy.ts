@@ -47,6 +47,7 @@ import {generateInstancesBatchTable} from "./createInstancesTile";
 import {FLOAT32_SIZE_BYTES, UINT16_SIZE_BYTES, UINT32_SIZE_BYTES, UINT8_SIZE_BYTES} from "./typeSize";
 const createI3dm = require('./createI3dm');
 import { ReOrganizeModel } from './ReOrganizeModel';
+import CreateI3DMTile from "./createI3DMTile";
 
 var sizeOfFloat = 4;
 var sizeOfUint16 = 2;
@@ -83,7 +84,7 @@ export function createBatchTableHierarchy(options) {
 
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/sample_all/";
+    var directoryPath = "../data/bim/revit/";
     options.gltfDirectory = directoryPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         // const xmlJson = value.xmlJson;
@@ -163,8 +164,51 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            const testi3dm = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
-            return createI3dmTile(options);
+            const reOrganize = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
+            const testi3dm = reOrganize.i3dm;
+            const restB3dm = reOrganize.b3dm;
+            const i3dmTileMap = await CreateI3DMTile.createI3DMTile(options,directoryPath,testi3dm,gltfMap);
+
+            const i3dmTilesetJson = tilesetJson;
+            i3dmTilesetJson.root.children = [];
+            const i3dmFileArr = [];
+            let label = 1;
+            for(const [key,value] of i3dmTileMap){
+                try {
+                    const fileName = "/i3dm/" + label + ".i3dm";
+                    const tilePath = path.join(options.directory , fileName);
+                    const temp = saveBinary(tilePath,key,options.gzip);
+                    i3dmFileArr.push(temp);
+                    const tileInfo:any = {
+                        boundingVolume:{
+                            box:[]
+                        },
+                        content:{
+                            uri:fileName
+                        },
+                        "geometricError": 0,
+                        "refine": "ADD"
+                    };
+                    const box = [
+                        value.center["x"] , value.center["y"] , value.center["z"],
+                        value.dimensions["x"] / 2, 0 , 0,
+                        0 , value.dimensions["y"] / 2,0,
+                        0 , 0 , value.dimensions["z"] / 2
+                    ];
+
+                    tileInfo.boundingVolume["box"] = box;
+                    i3dmTilesetJson.root.children.push(tileInfo);
+                    label++;
+                }catch (e) {
+                    console.error(e);
+                }
+
+            }
+            const i3dmTilesetJsonPath = path.join(directory, '/i3dm/tileset.json');
+            saveJson(i3dmTilesetJsonPath,i3dmTilesetJson, options.prettyJson);
+            Promise.all(i3dmFileArr);
+
+            // return createI3dmTile(options);
 
             if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
@@ -741,6 +785,7 @@ function createB3dmTile11(options) {
     });
 }
 
+// 合并相同模型为i3dm的测试代码
 function createI3dmTile(options) {
     var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
     var noParents = defaultValue(options.noParents, false);

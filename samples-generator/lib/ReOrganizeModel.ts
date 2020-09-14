@@ -60,7 +60,10 @@ export class  ReOrganizeModel {
             test = test.concat(value);
         }
         debugger
-        return sameMesh_Map;
+        return {
+            i3dm:sameMesh_Map,
+            b3dm:b3dmMap
+        };
     }
 
 }
