@@ -4,7 +4,7 @@ var fsExtra = require('fs-extra');
 var fastXmlParser = require('fast-xml-parser');
 import {JSONPath} from 'jsonpath-plus';
 import {
-    Cartesian3 as CesiumCartesian3,
+    Cartesian3,
     defaultValue,
     defined,
     Math as CesiumMath,
@@ -106,11 +106,11 @@ function traverseJson(obj,map) {
     return map;
 }
 
-class Cartesian3 {
+/*class Cartesian3 {
     x:number = 0;
     y:number = 0;
     z:number = 0;
-};
+};*/
 
 export class ElementInfo {
     center: Cartesian3 = new Cartesian3();
@@ -131,7 +131,7 @@ function computeAABB(minXYZStr,maxXYZStr,placementStr) {
     const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
     const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
     const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
-    const axis = Quaternion.computeAxis(quaternion,new CesiumCartesian3());
+    const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
     const angle = Quaternion.computeAngle(quaternion);
     const angle_degree = CesiumMath.toDegrees(angle);
 
@@ -202,6 +202,6 @@ function getMatrix4FromPlacement(placementStr) {
 function getTranslation(sitePlacementStr) {
     const sitePlacement = getMatrix4FromPlacement(sitePlacementStr);
     const mat4 = Matrix4.fromColumnMajorArray(sitePlacement);
-    const translation = Matrix4.getTranslation(mat4,new CesiumCartesian3());
+    const translation = Matrix4.getTranslation(mat4,new Cartesian3());
     return translation;
 }
