@@ -7,6 +7,7 @@ import { FeatureHierarchyClass } from './featureHierarchyClass';
 import { Material } from './Material';
 import { Mesh } from './Mesh';
 import {
+    clone as CesiumClone,
     Cartesian3,
     defaultValue,
     defined,
@@ -152,7 +153,7 @@ export function createBatchTableHierarchy(options) {
             ];
             var geometricError = computeSSE(rootbounds);
 
-            var opts:any = {
+            let opts:any = {
                 // contentUri : contentUri,
                 geometricError : geometricError,
                 box : box,
@@ -169,13 +170,16 @@ export function createBatchTableHierarchy(options) {
             const restB3dm = reOrganize.b3dm;
             const i3dmTileMap = await CreateI3DMTile.createI3DMTile(options,directoryPath,testi3dm,gltfMap);
 
-            const i3dmTilesetJson = tilesetJson;
+            opts.transform = Matrix4.toArray(Matrix4.IDENTITY);
+            const i3dmTilesetJson = createTilesetJsonSingle(opts);
+            delete i3dmTilesetJson.root['content'];
+            // delete i3dmTilesetJson.root.transform;
             i3dmTilesetJson.root.children = [];
             const i3dmFileArr = [];
             let label = 1;
             for(const [key,value] of i3dmTileMap){
                 try {
-                    const fileName = "/i3dm/" + label + ".i3dm";
+                    const fileName = label + ".i3dm";
                     const tilePath = path.join(options.directory , fileName);
                     const temp = saveBinary(tilePath,key,options.gzip);
                     i3dmFileArr.push(temp);
@@ -204,15 +208,15 @@ export function createBatchTableHierarchy(options) {
                 }
 
             }
-            const i3dmTilesetJsonPath = path.join(directory, '/i3dm/tileset.json');
+            const i3dmTilesetJsonPath = path.join(directory, 'tileset1.json');
             saveJson(i3dmTilesetJsonPath,i3dmTilesetJson, options.prettyJson);
             Promise.all(i3dmFileArr);
 
             // return createI3dmTile(options);
 
-            if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
+            if(restB3dm.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
-                gltfMap.forEach((value,key) =>{
+                restB3dm.forEach((value,key) =>{
                     gltfNameArr.push(key);
                 })
 
@@ -246,7 +250,7 @@ export function createBatchTableHierarchy(options) {
                 const xArr = [];
                 const yArr = [];
                 const zArr = [];
-                gltfMap.forEach(function(value,key){
+                restB3dm.forEach(function(value,key){
                     xArr.push(value.center.z);
                     yArr.push(value.center.x);
                     zArr.push(value.center.y);
@@ -271,18 +275,18 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
                  */
-                const maxPoints = Math.round(gltfMap.size / 8);
+                const maxPoints = Math.round(restB3dm.size / 8);
 
                 const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
-                gltfMap.forEach(function(value,key){
+                restB3dm.forEach(function(value,key){
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 });
-                /*for(var [key, value] of gltfMap){
+                /*for(var [key, value] of restB3dm){
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 }*/
 
-                if(octree.pointCount !== gltfMap.size){
+                if(octree.pointCount !== restB3dm.size){
                     console.error("模型缺失！");
                 }
                 if(octree.getDepth() > 0){

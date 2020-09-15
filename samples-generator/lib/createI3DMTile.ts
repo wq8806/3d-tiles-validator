@@ -66,6 +66,9 @@ async function createI3dmTile(options,directoryPath,i3dmMap,gltfMap) {
         const batchTableBinary = undefined;
 
         const templateGlbName = value[0];
+        /*if(templateGlbName.indexOf("0ELdlxJuP1AwzgUXpRT7jq--IfcMember--70.glb") >= 0){
+            debugger
+        }*/
         const templateInfo = gltfMap.get(templateGlbName);
         const templateUrl = directoryPath + templateGlbName;
         //对应下方的模板信息进行更改

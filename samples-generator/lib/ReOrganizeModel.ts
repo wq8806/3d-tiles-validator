@@ -32,13 +32,26 @@ export class  ReOrganizeModel {
                 const mesh = Mesh.fromGltf(gltf);
                 const keyArr = key.split('--');
                 const ifcType = keyArr[1];
+                /*if(keyArr[0] === "3TeCKetmHBLBKhU3YblHYF"){
+                    debugger
+                }*/
 
                 const obb = computeOBBSize(mesh,value.objectPlacement);
                 // const aabb = computeAABBSize(value.objectPlacement,value.minXYZ,value.maxXYZ);
-                const meshKey = new MeshKey(mesh,ifcType,obb);
+                const meshKey = new MeshKey(mesh,ifcType,obb,value.objectPlacement);
                 const existKey = contains(sameMesh_Map,meshKey);
                 if(existKey !== null){
-                    sameMesh_Map.get(existKey).push(key);
+                    const glbNameArr = sameMesh_Map.get(existKey);
+                    const placementArr = [];
+                    for (let i = 0; i < glbNameArr.length; i++) {
+                        placementArr.push(gltfMap.get(glbNameArr[i]).objectPlacement);
+                    }
+                    if(!containsPlacement(placementArr,value.objectPlacement)){
+                        sameMesh_Map.get(existKey).push(key);
+                        // value.objectPlacement = updateTranslation(existKey.mesh,mesh,value.objectPlacement);
+                    }else {
+                        sameMesh_Map.set(meshKey,[key]);
+                    }
                 }else {
                     sameMesh_Map.set(meshKey,[key]);
                 }
@@ -47,7 +60,7 @@ export class  ReOrganizeModel {
             console.error(e);
         }
 
-        debugger
+        // debugger
         const b3dmMap = new Map();
         let test = [];
         for(const [key,value] of sameMesh_Map){
@@ -58,8 +71,12 @@ export class  ReOrganizeModel {
         }
         for (const [key,value] of sameMesh_Map){
             test = test.concat(value);
+            const join = value.join(',');
+            if(join.indexOf("3TeCKetmHBLBKhU3YblHYF") >= 0){
+                debugger
+            }
         }
-        debugger
+        // debugger
         return {
             i3dm:sameMesh_Map,
             b3dm:b3dmMap
@@ -72,11 +89,13 @@ class MeshKey {
     mesh:Mesh;
     ifcType: string;
     obbSize: number[];
+    objectPlacement: number[]; //revit 模型中部件objectPlacement相同,objectPlacement有错误的情况
 
-    constructor(mesh,ifcType,obbSize) {
+    constructor(mesh,ifcType,obbSize,objectPlacement) {
         this.mesh = mesh;
         this.ifcType = ifcType;
         this.obbSize = obbSize;
+        this.objectPlacement = objectPlacement;
     }
 
     static equals(key1:MeshKey,key2:MeshKey){
@@ -84,9 +103,48 @@ class MeshKey {
             key1.ifcType === key2.ifcType &&
             key1.obbSize.indexOf(key2.obbSize[0]) >= 0 &&
             key1.obbSize.indexOf(key2.obbSize[1]) >= 0 &&
-            key1.obbSize.indexOf(key2.obbSize[2]) >= 0) {
+            key1.obbSize.indexOf(key2.obbSize[2]) >= 0 &&
+            !sameObjectPlacement(key1.objectPlacement,key2.objectPlacement)) {
             return true;
         }
+        return false;
+    }
+}
+
+function updateTranslation(templateMesh,mesh,placementArray) {
+    const templateCenter = templateMesh.center;
+    const center = mesh.center;
+    const trans = Cartesian3.subtract(center,templateCenter,new Cartesian3());
+
+    const mat4 = Matrix4.fromColumnMajorArray(placementArray);
+    const trans_fromMat4 = Matrix4.getTranslation(mat4,new Cartesian3());
+    const update_trans = Cartesian3.add(trans_fromMat4,trans,new Cartesian3());
+    const update_Mat4 = Matrix4.setTranslation(mat4,update_trans,new Matrix4());
+    return Matrix4.toArray(update_Mat4);
+}
+function containsPlacement(placementArr,placement) {
+    for (let i = 0; i < placementArr.length; i++) {
+        const temp = placementArr[i];
+        if(temp.length === placement.length){
+            if(temp.toString() === placement.toString()){
+                return true;
+            }
+        }else {
+            return false;
+        }
+    }
+    return false;
+}
+
+function sameObjectPlacement(placement1,placement2){
+    if(placement1.length === placement2.length){
+        for (let i = 0; i < placement1.length; i++) {
+            if(placement1[i] !== placement2[i]){
+                return false;
+            }
+        }
+        return true;
+    }else {
         return false;
     }
 }
@@ -106,8 +164,9 @@ function computeOBBSize(mesh,placementArray) {
     try {
         const mat4 = Matrix4.fromColumnMajorArray(placementArray);
         const mat4_inverse = Matrix4.inverseTransformation(mat4,new Matrix4());
-        mesh.transform(mat4_inverse);
-        const positions = mesh.positions;
+        const mesh_copy = Mesh.clone(mesh);
+        mesh_copy.transform(mat4_inverse);
+        const positions = mesh_copy.positions;
         const xArr = [];
         const yArr = [];
         const zArr = [];
