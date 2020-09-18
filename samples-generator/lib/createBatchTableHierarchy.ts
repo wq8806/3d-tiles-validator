@@ -75,18 +75,20 @@ var whiteOpaqueMaterial = new Material([1.0, 1.0, 1.0, 1.0]);
 let buildStoreyMap;
 let xmlJson;
 export function createBatchTableHierarchy(options) {
-    var use3dTilesNext = defaultValue(options.use3dTilesNext, false);
-    var useGlb = defaultValue(options.useGlb, false);
-    var gzip = defaultValue(options.gzip, false);
-    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
-    var noParents = defaultValue(options.noParents, false);
-    var multipleParents = defaultValue(options.multipleParents, false);
-    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
+    const use3dTilesNext = defaultValue(options.use3dTilesNext, false);
+    const useGlb = defaultValue(options.useGlb, false);
+    const gzip = defaultValue(options.gzip, false);
+    const useBatchTableBinary = defaultValue(options.batchTableBinary, false);
+    const noParents = defaultValue(options.noParents, false);
+    const multipleParents = defaultValue(options.multipleParents, false);
+    const transform = defaultValue(options.transform, Matrix4.IDENTITY);
 
-    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
+    const compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
 
-    var directoryPath = "../data/bim/revit/";
+    const directoryPath = path.join(options.input,'/');
+    const outputPath = defaultValue(options.output,path.join(directoryPath,'output'))
     options.gltfDirectory = directoryPath;
+    options.outputPath = outputPath;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         // const xmlJson = value.xmlJson;
         xmlJson = value.xmlJson;
@@ -125,25 +127,8 @@ export function createBatchTableHierarchy(options) {
                 })
             });
             //console.log(gltfMap);
-            var directory = options.directory;
-            var tilesetJsonPath = path.join(directory, 'tileset.json');
+            const tilesetJsonPath = path.join(outputPath, 'tileset.json');
 
-            /*const placement = [0.798636 ,0.601815 ,0 ,0 ,-0.601815 ,0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-19.8236 ,-18.8083 ,0 ,1];
-            const matrix4 = Matrix4.fromColumnMajorArray(placement);
-            const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
-            const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
-
-            let c1 = new Cartesian3(rootbounds.dimensions.x / 2, 0 , 0);
-            c1 = Matrix3.multiplyByVector(rotation_mat3,c1,new Cartesian3());
-            let c2 = new Cartesian3(0 , rootbounds.dimensions.y / 2,0);
-            c2 = Matrix3.multiplyByVector(rotation_mat3,c2,new Cartesian3());
-            let c3 = new Cartesian3(0 , 0 , rootbounds.dimensions.z / 2);
-            c3 = Matrix3.multiplyByVector(rotation_mat3,c3,new Cartesian3());
-            var box = [
-                rootbounds.center.x , rootbounds.center.y , rootbounds.center.z,
-                c1.x, c1.y, c1.z,
-                c2.x, c2.y, c2.z,
-                c3.x, c3.y, c3.z,];
             //3dTiles中是OBB,而非AABB，可以将向量进行旋转实现*/
             var box = [
                 rootbounds.center.x , rootbounds.center.y , rootbounds.center.z,
@@ -165,58 +150,12 @@ export function createBatchTableHierarchy(options) {
                 Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
                 Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
             }
-            const reOrganize = await ReOrganizeModel.organizeI3dm(directoryPath,gltfMap);
-            const testi3dm = reOrganize.i3dm;
-            const restB3dm = reOrganize.b3dm;
-            const i3dmTileMap = await CreateI3DMTile.createI3DMTile(options,directoryPath,testi3dm,gltfMap);
-
-            opts.transform = Matrix4.toArray(Matrix4.IDENTITY);
-            const i3dmTilesetJson = createTilesetJsonSingle(opts);
-            delete i3dmTilesetJson.root['content'];
-            // delete i3dmTilesetJson.root.transform;
-            i3dmTilesetJson.root.children = [];
-            const i3dmFileArr = [];
-            let label = 1;
-            for(const [key,value] of i3dmTileMap){
-                try {
-                    const fileName = label + ".i3dm";
-                    const tilePath = path.join(options.directory , fileName);
-                    const temp = saveBinary(tilePath,key,options.gzip);
-                    i3dmFileArr.push(temp);
-                    const tileInfo:any = {
-                        boundingVolume:{
-                            box:[]
-                        },
-                        content:{
-                            uri:fileName
-                        },
-                        "geometricError": 0,
-                        "refine": "ADD"
-                    };
-                    const box = [
-                        value.center["x"] , value.center["y"] , value.center["z"],
-                        value.dimensions["x"] / 2, 0 , 0,
-                        0 , value.dimensions["y"] / 2,0,
-                        0 , 0 , value.dimensions["z"] / 2
-                    ];
-
-                    tileInfo.boundingVolume["box"] = box;
-                    i3dmTilesetJson.root.children.push(tileInfo);
-                    label++;
-                }catch (e) {
-                    console.error(e);
-                }
-
-            }
-            const i3dmTilesetJsonPath = path.join(directory, 'tileset1.json');
-            saveJson(i3dmTilesetJsonPath,i3dmTilesetJson, options.prettyJson);
-            Promise.all(i3dmFileArr);
 
             // return createI3dmTile(options);
 
-            if(restB3dm.size < 40){   //小于40个模型合并为单个b3dm
+            if(gltfMap.size < 40){   //小于40个模型合并为单个b3dm
                 const gltfNameArr = [];
-                restB3dm.forEach((value,key) =>{
+                gltfMap.forEach((value,key) =>{
                     gltfNameArr.push(key);
                 })
 
@@ -225,7 +164,7 @@ export function createBatchTableHierarchy(options) {
                 try {
                     tilesetJson.root['content'] = {uri: options.b3dmName};
                     return createB3dmTile(options).then(value => {
-                        const tilePath = path.join(options.directory , value.name);
+                        const tilePath = path.join(options.outputPath , value.name);
                         console.log("done");
                         return Promise.all([
                             saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
@@ -250,7 +189,7 @@ export function createBatchTableHierarchy(options) {
                 const xArr = [];
                 const yArr = [];
                 const zArr = [];
-                restB3dm.forEach(function(value,key){
+                gltfMap.forEach(function(value,key){
                     xArr.push(value.center.z);
                     yArr.push(value.center.x);
                     zArr.push(value.center.y);
@@ -275,10 +214,10 @@ export function createBatchTableHierarchy(options) {
                  * @param {Number} [maxPoints=8] - Number of distinct points per octant before it splits up.
                  * @param {Number} [maxDepth=8] - The maximum tree depth level, starting at 0.
                  */
-                const maxPoints = Math.round(restB3dm.size / 8);
+                const maxPoints = Math.round(gltfMap.size / 8);
 
                 const octree = new PointOctree.PointOctree(rootbox.min, rootbox.max, 0.0, maxPoints);  //200 50 20
-                restB3dm.forEach(function(value,key){
+                gltfMap.forEach(function(value,key){
                     //octree 源码中put方法中取消点是否存在的判断，否则部分点不会添加到八叉树空间中，具体代码为，需注释掉 exists = octant.points[i].equals(point);重build
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 });
@@ -286,7 +225,7 @@ export function createBatchTableHierarchy(options) {
                     octree.put(new math_ds.Vector3(value.center.z, value.center.x, value.center.y), {name:key,value:value});
                 }*/
 
-                if(octree.pointCount !== restB3dm.size){
+                if(octree.pointCount !== gltfMap.size){
                     console.error("模型缺失！");
                 }
                 if(octree.getDepth() > 0){
@@ -344,7 +283,7 @@ export function createBatchTableHierarchy(options) {
                     deleteNull(testss);
 
                     // console.log(JSON.stringify(testss));
-                    var children = JSON.parse(JSON.stringify(testss.children));
+                    const children = JSON.parse(JSON.stringify(testss.children));
                     tilesetJson.root.children = children;
                     // console.log(JSON.stringify(tilesetJson));
                 }catch (e) {
@@ -362,7 +301,7 @@ export function createBatchTableHierarchy(options) {
                 return Promise.all(promiseArr).then(function (results) {
                     var b3dmNameArr = getChildrenName(tilesetJson.root.children,undefined);
                     for (let i = 0; i < results.length; i++) {
-                        var tilePath = path.join(options.directory , results[i]["name"]);
+                        var tilePath = path.join(outputPath , results[i]["name"]);
                         saveBinary(tilePath, results[i]["b3dm"], options.gzip)
                     }
                     console.log("done");
@@ -467,7 +406,7 @@ function modifyOctantMinAndMax(tilesetRootChild,minXYZ,maxXYZ) {
 function getChildrenName(children,nameArray) {
     nameArray = !nameArray ? new Array : nameArray;
     for (let i = 0; i < children.length; i++) {
-        var child = children[i];
+        const child = children[i];
         if(!!child.content){
             nameArray.push(child.content.uri);
         }
@@ -481,7 +420,7 @@ function getChildrenName(children,nameArray) {
 function createB3DMTask(options,children,promiseArray) {
     promiseArray = !promiseArray ? new Array : promiseArray;
     for (let i = 0; i < children.length; i++) {
-        var child = children[i];
+        const child = children[i];
         if(!!child.content){
             options.nameArray = child.content.nameArray;
             options.b3dmName = child.content.uri;
@@ -552,7 +491,7 @@ function createB3dmTile(options) {
      ];*/
 
     var contentUri = options.b3dmName;
-    var directory = options.directory;
+    var directory = options.outputPath;
     var tilePath = path.join(directory, contentUri);
 
     var buildingsLength = 1;
@@ -789,493 +728,6 @@ function createB3dmTile11(options) {
     });
 }
 
-// 合并相同模型为i3dm的测试代码
-function createI3dmTile(options) {
-    var useBatchTableBinary = defaultValue(options.batchTableBinary, false);
-    var noParents = defaultValue(options.noParents, false);
-    var multipleParents = defaultValue(options.multipleParents, false);
-    var transform = defaultValue(options.transform, Matrix4.IDENTITY);
-    var compressDracoMeshes = defaultValue(options.compressDracoMeshes, false);
-
-
-    // Mesh urls listed in the same order as features in the classIds arrays
-    var urls = [];
-    return fsExtra.readFile("../data/bim/sample_i3dm/name.txt", 'utf-8', async function (err,data) {
-        if(err){
-            console.error(err);
-        }
-        else{
-            var str_array = data.split(",");
-            str_array.forEach(function (value) {
-                urls.push('../data/bim/sample_i3dm/'+value);
-            })
-
-            var instances = createInstances11(noParents, multipleParents,urls.length,urls);
-            var batchTableJson = createBatchTableJson(instances, options);
-
-            var batchTableBinary;
-            if (useBatchTableBinary) {
-                batchTableBinary = createBatchTableBinary(batchTableJson, options);  // Modifies the json in place
-            }
-
-            /*var buildingPositions = [
-                new Cartesian3(-29.73924456, 79.6033968, 0)     //若ifcopenshell未指定use-world-coord，则导出dae时最顶层mesh包含matrix信息，需要每个ifcElement中转换矩阵的平移量 -y*LengthUnit  x*LengthUnit,对应gltf中的mesh0Matrix
-            ];*/
-
-            var buildingPositions = [
-                new Cartesian3(0,0,0)   //ifcopenshell指定use-world-coord,gltf中顶点位置已含转换信息，无需再做平移变换
-            ];
-
-            // glTF models are initially y-up, transform to z-up
-            var yUpToZUp = Quaternion.fromAxisAngle(Cartesian3.UNIT_X, CesiumMath.PI_OVER_TWO);
-            var zUpRotation0 = Quaternion.fromAxisAngle(Cartesian3.UNIT_Z, 0);            //每个ifcElement中转换矩阵旋转矩阵为单位阵时使用
-            var scale = new Cartesian3(1.0, 1.0, 1.0); // Scale the models up a bit
-
-            // Local transforms of the buildings within the tile
-            var buildingTransforms = [
-                Matrix4.fromTranslationQuaternionRotationScale(buildingPositions[0], zUpRotation0, scale)
-            ];
-            /* var buildingTransforms = [
-                 Matrix4.fromTranslation(buildingPositions[0])
-             ];*/
-
-
-            var contentUri = 'tile.i3dm';
-            var directory = options.directory;
-            var tilePath = path.join(directory, contentUri);
-            var tilesetJsonPath = path.join(directory, 'tileset.json');
-
-            var buildingsLength = 1;
-            var meshesLength = urls.length;
-            var batchLength = buildingsLength * meshesLength;
-            var geometricError = 70.0;
-
-            var box = [
-                -22.48, 52.06, 5.33,
-                78.55, 0, 0,
-                0, 159.535, 0,
-                0, 0, 7.155
-            ];
-            /* var box = [
-                 0, 0, -1.17,
-                 10, 0, 0,
-                 0, 10, 0,
-                 0, 0, 6.955
-             ];*/
-            /* var box = [
-                 0, 0, 10,
-                 50, 0, 0,
-                 0, 50, 0,
-                 0, 0, 10
-             ];*/
-
-            var tilesetJson = createTilesetJsonSingle({
-                contentUri : contentUri,
-                geometricError : geometricError,
-                box : box,
-                transform : transform
-            } as any);
-
-            if (!options.legacy) {
-                Extensions.addExtensionsUsed(tilesetJson, '3DTILES_batch_table_hierarchy');
-                Extensions.addExtensionsRequired(tilesetJson, '3DTILES_batch_table_hierarchy');
-            }
-            //对应下方的模板信息进行更改
-            let gltf = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
-                {
-                    resourceDirectory : urls[0]
-                });
-            let gltf1 = await getGltfFromGlbUri(urls[0],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
-                {
-                    resourceDirectory : urls[0]
-                });
-            const mesh1 = Mesh.fromGltf(gltf1);
-            let gltf2 = await getGltfFromGlbUri(urls[1],   // 0 -1 0 0 1 0 0 0 0 0 1 0 -595.3 17895.5 6350 1
-                {
-                    resourceDirectory : urls[1]
-                });
-            const mesh2 = Mesh.fromGltf(gltf2);
-            const same = Mesh.isSameI3dm(mesh1,mesh2);
-
-            debugger
-           /* const placementArray = [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1] //07hc1aZW98debjzrL5HoR4 第二排第四个
-            const boundsobj = {
-                minXYZ : [-0.6448 ,16.9205 ,6.35] ,
-                maxXYZ : [-0.5848 ,18.8705 ,7.565]
-            }*/
-
-            const placementArray = [-0.798636 ,-0.601815 ,0 ,0 ,0.601815 ,-0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-20.2451 ,-21.2052 ,0 ,1]//[1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1]//07hc1aZW98debjzrL5Ho8h 拐角第一个
-            const boundsobj = {
-                minXYZ: [-20.7728 ,-21.4226 ,-0.000609347],
-                maxXYZ: [-20.2461 ,-20.8932 ,0.775503]
-            }
-
-            let mat4 = Matrix4.fromColumnMajorArray(placementArray);
-
-            const needScale = false;
-            let scaleMatrix = Matrix4.IDENTITY;
-            if(needScale){
-                const mat3 = Matrix4.getMatrix3(mat4,new Matrix3());
-                const rotation_template = Matrix3.getRotation(mat3,mat3);
-                const rotation_template_inverse = Matrix3.inverse(rotation_template,new Matrix3());
-
-                const x_length = boundsobj.maxXYZ[0] - boundsobj.minXYZ[0];  //1,0,2
-                const y_length = boundsobj.maxXYZ[1] - boundsobj.minXYZ[1];
-                const z_length = boundsobj.maxXYZ[2] - boundsobj.minXYZ[2];
-
-                let scale_template = new Cartesian3(
-                    1 / x_length,
-                    1 / y_length,
-                    1 / z_length);
-                scale_template = Matrix3.multiplyByVector(rotation_template_inverse,scale_template,scale_template);
-                // {
-                //   "x": 0.512820512820513,
-                //   "y": 16.666666666666654,
-                //   "z": 0.8230452674897114
-                // }
-                scale_template = Cartesian3.abs(scale_template,scale_template);
-                scaleMatrix = Matrix4.fromScale(scale_template);
-            }
-
-            let inverse_mat4 = Matrix4.inverse(mat4,new Matrix4());
-            inverse_mat4 = Matrix4.multiply(scaleMatrix,inverse_mat4,inverse_mat4);
-            // const scale1 = Matrix4.getScale(inverse_mat4,new Cartesian3());
-            // inverse_mat4 = Matrix4.multiplyByScale(inverse_mat4,scale_template,inverse_mat4);
-            const mesh = Mesh.fromGltf(gltf);
-            const transformMesh = Mesh.clone(mesh);
-            transformMesh.transform(inverse_mat4);
-            const batchedMesh = Mesh.batch([transformMesh]);
-            if(needScale){
-                const center = batchedMesh.center;
-                const center_negate = Cartesian3.negate(center, new Cartesian3());
-                const center_transform = Matrix4.fromTranslation(center_negate);
-                batchedMesh.transform(center_transform);
-            }
-            const template = await createGltf({
-                mesh : batchedMesh,
-                compressDracoMeshes : true,
-                useBatchIds : false
-            });
-            /*const template_glb = await createGlb({
-                mesh : batchedMesh,
-                compressDracoMeshes : false,
-                //useBatchIds : false
-            });*/
-            // return saveBinary(tilePath, template, options.gzip);
-            //Ifcplate
-            /*const instancesplacementArray = [
-                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,17.8955 ,6.350 ,1],
-                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,15.8955 ,6.350 ,1],
-                [0 ,-1 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.5953 ,0.187225 ,6.350 ,1],//边角
-                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,-0.0328 ,-0.6461 ,6.350 ,1],//拐角第一个  07hc1aZW98debjzrL5Ho8h
-                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,1.4047 ,-0.6461 ,6.350 ,1]//拐角第二个 07hc1aZW98debjzrL5Ho8e
-            ];
-            const instancesBoundsObj = [
-                {
-                    minXYZ : [-0.6448 ,16.9205 ,6.35] ,
-                    maxXYZ : [-0.5848 ,18.8705 ,7.565]
-                },
-                {
-                    minXYZ : [-0.6448 ,14.9205 ,6.35] ,
-                    maxXYZ : [-0.5848 ,16.8705 ,7.565]
-                },
-                {
-                    minXYZ: [-0.6448 ,-0.4961 ,6.35],
-                    maxXYZ: [-0.5848 ,0.87055 ,7.565]
-                },
-                {
-                    minXYZ: [-0.4453 ,-0.6956 ,6.35],
-                    maxXYZ: [0.3797 ,-0.6356 ,7.565]
-                },
-                {
-                    minXYZ: [0.4297 ,-0.6956 ,6.35],
-                    maxXYZ: [2.3797 ,-0.6356 ,7.565]
-                }]*/
-            //IfcDoor
-            /*const instancesplacementArray = [
-                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,15.0955 ,0 ,1],
-                [0 ,1 ,0 ,0 ,-1 ,0 ,0 ,0 ,0 ,0 ,1 ,0 ,7.7547 ,19.0955 ,0 ,1],
-                [1 ,0 ,0 ,0 ,0 ,1 ,0 ,0 ,0 ,0 ,1 ,0 ,14.1465 ,47.1741 ,3.800 ,1]
-            ];
-            const instancesBoundsObj = [
-                {
-                    minXYZ: [7.5912 ,15.0195 ,0],
-                    maxXYZ: [7.7797 ,16.0865 ,2.21]
-                },
-                {
-                    minXYZ: [7.5912 ,19.0195 ,0],
-                    maxXYZ: [7.7797 ,20.0865 ,2.21]
-                },
-                {
-                    minXYZ: [14.0705 ,47.1491 ,3.8],
-                    maxXYZ: [15.1375 ,47.3376 ,6.01]
-                }
-            ];*/
-            const instancesplacementArray = [
-                [-0.798636 ,-0.601815 ,0 ,0 ,0.601815 ,-0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-20.2451 ,-21.2052 ,0 ,1],
-                [0.798636 ,0.601815 ,0 ,0 ,-0.601815 ,0.798636 ,0 ,0 ,0 ,0 ,1 ,0 ,-21.9509 ,-21.4638 ,0 ,1]
-            ];
-            const instancesBoundsObj = [
-                {
-                    minXYZ: [-20.7728 ,-21.4226 ,-0.000609347],
-                    maxXYZ: [-20.2461 ,-20.8932 ,0.775503]
-                },
-                {
-                    minXYZ: [-22.1876 ,-21.462 ,-0.000609347],
-                    maxXYZ: [-21.6609 ,-20.9325 ,0.775503]
-                }
-            ];
-            const instancesLength = instancesplacementArray.length;
-            const featureTableJson: any = {};
-            featureTableJson.INSTANCES_LENGTH = instancesLength;
-
-            let attributes = [];
-            attributes.push(
-                getPositions(instancesplacementArray)
-            );
-
-            const orientations = true;
-            const eastNorthUp = defaultValue(options.eastNorthUp, false);
-            if (orientations) {
-                attributes = attributes.concat(getOrientations(instancesplacementArray));
-            } else if (eastNorthUp) {
-                featureTableJson.EAST_NORTH_UP = true;
-            }
-
-            const nonUniformScales = needScale;   //缩放只适合于单一材质模型，两种及以上材质模型缩放需要按primitive来
-            if (nonUniformScales) {
-                const scaleArray = [];
-                for (let i = 0; i < instancesBoundsObj.length; i++) {
-                    const instanceBounds = instancesBoundsObj[i];
-                    let scale = new Cartesian3(
-                        instanceBounds.maxXYZ[0] - instanceBounds.minXYZ[0],
-                        instanceBounds.maxXYZ[1] - instanceBounds.minXYZ[1],
-                        instanceBounds.maxXYZ[2] - instanceBounds.minXYZ[2]);
-                    const matrix4 = Matrix4.fromColumnMajorArray(instancesplacementArray[i]);
-                    const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
-                    let rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
-                    // rotation_mat3 = Matrix3.multiply(rotation_template_inverse,rotation_mat3,rotation_mat3);
-
-                    let rotateScale = Matrix3.multiplyByVector(rotation_mat3,scale,new Cartesian3());
-                    rotateScale = Cartesian3.abs(rotateScale,rotateScale);
-                    scaleArray.push(rotateScale);
-                }
-
-                attributes.push(getNonUniformScales(scaleArray));
-            }
-
-            const batchIds = true;
-            if (batchIds) {
-                attributes.push(getBatchIds(instancesLength));
-            }
-
-            let i;
-            let attribute;
-            let byteOffset = 0;
-            let attributesLength = attributes.length;
-            for (i = 0; i < attributesLength; ++i) {
-                attribute = attributes[i];
-                const byteAlignment = attribute.byteAlignment;
-                byteOffset = Math.ceil(byteOffset / byteAlignment) * byteAlignment; // Round up to the required alignment
-                attribute.byteOffset = byteOffset;
-                byteOffset += attribute.buffer.length;
-            }
-
-            const featureTableBinary = Buffer.alloc(byteOffset);
-
-            for (i = 0; i < attributesLength; ++i) {
-                attribute = attributes[i];
-                featureTableJson[attribute.propertyName] = {
-                    byteOffset: attribute.byteOffset,
-                    componentType: attribute.componentType // Only defined for batchIds
-                };
-                attribute.buffer.copy(featureTableBinary, attribute.byteOffset);
-            }
-
-            /*let batchTableJson;
-            let batchTableBinary;
-            const createBatchTable = true;
-            if (createBatchTable) {
-                batchTableJson = generateInstancesBatchTable(
-                    instancesLength,
-                    modelSize
-                );
-            }*/
-
-            const i3dm = createI3dm({
-                featureTableJson: featureTableJson,
-                featureTableBinary: featureTableBinary,
-                batchTableJson: batchTableJson,
-                batchTableBinary: batchTableBinary,
-                glb: template,
-                // uri: ""   未指定glb，时读glb文件
-            });
-            return Promise.all([
-                saveJson(tilesetJsonPath, tilesetJson, options.prettyJson),
-                saveBinary(tilePath, i3dm, options.gzip)
-            ]);
-            return saveJson(tilePath,template,options.prettyJson);
-
-        }
-    });
-}
-
-function getBatchIds(instancesLength: number) {
-    let i: number;
-    let buffer: Buffer;
-    let componentType: string;
-    let byteAlignment: number;
-
-    if (instancesLength < 256) {
-        buffer = Buffer.alloc(instancesLength * UINT8_SIZE_BYTES);
-        for (i = 0; i < instancesLength; ++i) {
-            buffer.writeUInt8(i, i * UINT8_SIZE_BYTES);
-        }
-        componentType = 'UNSIGNED_BYTE';
-        byteAlignment = UINT8_SIZE_BYTES;
-    } else if (instancesLength < 65536) {
-        buffer = Buffer.alloc(instancesLength * UINT16_SIZE_BYTES);
-        for (i = 0; i < instancesLength; ++i) {
-            buffer.writeUInt16LE(i, i * UINT16_SIZE_BYTES);
-        }
-        componentType = 'UNSIGNED_SHORT';
-        byteAlignment = UINT16_SIZE_BYTES;
-    } else {
-        buffer = Buffer.alloc(instancesLength * UINT32_SIZE_BYTES);
-        for (i = 0; i < instancesLength; ++i) {
-            buffer.writeUInt32LE(i, i * UINT32_SIZE_BYTES);
-        }
-        componentType = 'UNSIGNED_INT';
-        byteAlignment = UINT32_SIZE_BYTES;
-    }
-
-    return {
-        buffer: buffer,
-        componentType: componentType,
-        propertyName: 'BATCH_ID',
-        byteAlignment: byteAlignment
-    };
-}
-
-function getNonUniformScales(scaleArray) {
-    const instancesLength = scaleArray.length;
-    const buffer = Buffer.alloc(instancesLength * 3 * FLOAT32_SIZE_BYTES);
-    for (let i = 0; i < instancesLength; ++i) {
-        const scale = scaleArray[i];
-        buffer.writeFloatLE(scale.x, i * 3 * FLOAT32_SIZE_BYTES);
-        buffer.writeFloatLE(scale.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
-        buffer.writeFloatLE(scale.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
-    }
-    return {
-        buffer: buffer,
-        propertyName: 'SCALE_NON_UNIFORM',
-        byteAlignment: FLOAT32_SIZE_BYTES
-    };
-}
-
-function getNormal(instancesplacement) {
-    const matrix4 = Matrix4.fromColumnMajorArray(instancesplacement);
-    const matrix3 = Matrix4.getMatrix3(matrix4,new Matrix3());
-    const rotation_mat3 = Matrix3.getRotation(matrix3,new Matrix3());
-    const quaternion = Quaternion.fromRotationMatrix(rotation_mat3);
-    const axis = Quaternion.computeAxis(quaternion,new Cartesian3());
-    const angle = Quaternion.computeAngle(quaternion);
-    const angle_degree = CesiumMath.toDegrees(angle);
-
-    const up = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(0,1,0),new Cartesian3());
-    const right = Matrix3.multiplyByVector(rotation_mat3,new Cartesian3(1,0,0),new Cartesian3());
-
-    const normal = up;//new Cartesian3(0,-1,0);
-    Cartesian3.normalize(normal, normal);
-    return {
-        up:Cartesian3.normalize(up, up),
-        right:Cartesian3.normalize(right,right)
-    };
-}
-
-function generateRandomNormal() {
-    const x = CesiumMath.nextRandomNumber();
-    const y = CesiumMath.nextRandomNumber();
-    const z = CesiumMath.nextRandomNumber();
-
-    const normal = new Cartesian3(x, y, z);
-    Cartesian3.normalize(normal, normal);
-    return normal;
-}
-
-function getOrthogonalNormal(normal) {
-    const randomNormal = generateRandomNormal();
-    const orthogonal = Cartesian3.cross(normal, randomNormal, randomNormal);
-    return Cartesian3.normalize(orthogonal, orthogonal);
-    /*const orthogonal = right;//new Cartesian3(-1,0,0);
-    return Cartesian3.normalize(orthogonal, orthogonal);*/
-}
-
-function getOrientations(instancesplacementArray) {
-    const instancesLength = instancesplacementArray.length
-    const normalsUpBuffer = Buffer.alloc(
-        instancesLength * 3 * FLOAT32_SIZE_BYTES
-    );
-    const normalsRightBuffer = Buffer.alloc(
-        instancesLength * 3 * FLOAT32_SIZE_BYTES
-    );
-    for (let i = 0; i < instancesLength; ++i) {
-        if(i=== 3){
-            debugger
-        }
-        const normalObj = getNormal(instancesplacementArray[i]);
-        const normalUp = normalObj.up;
-        normalsUpBuffer.writeFloatLE(normalUp.x, i * 3 * FLOAT32_SIZE_BYTES);
-        normalsUpBuffer.writeFloatLE(normalUp.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
-        normalsUpBuffer.writeFloatLE(normalUp.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
-
-        const normalRight = normalObj.right;
-        normalsRightBuffer.writeFloatLE(normalRight.x, i * 3 * FLOAT32_SIZE_BYTES);
-        normalsRightBuffer.writeFloatLE(normalRight.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
-        normalsRightBuffer.writeFloatLE(normalRight.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
-    }
-
-    return [
-        {
-            buffer: normalsUpBuffer,
-            propertyName: 'NORMAL_UP',
-            byteAlignment: FLOAT32_SIZE_BYTES
-        },
-        {
-            buffer: normalsRightBuffer,
-            propertyName: 'NORMAL_RIGHT',
-            byteAlignment: FLOAT32_SIZE_BYTES
-        }
-    ];
-}
-
-function getPosition(transform) {
-    const matrix4 = Matrix4.fromColumnMajorArray(transform);
-    //const scale = Matrix4.getScale(matrix4,new Cartesian3());
-    let position = new Cartesian3(0, 0, 0);
-    Matrix4.multiplyByPoint(matrix4, position, position);
-
-    return position;
-}
-
-function getPositions(transformArray) {
-    const instancesLength = transformArray.length;
-    const buffer = Buffer.alloc(instancesLength * 3 * FLOAT32_SIZE_BYTES);
-    for (let i = 0; i < instancesLength; ++i) {
-        const position = getPosition(
-            transformArray[i]
-        );
-        buffer.writeFloatLE(position.x, i * 3 * FLOAT32_SIZE_BYTES);
-        buffer.writeFloatLE(position.y, (i * 3 + 1) * FLOAT32_SIZE_BYTES);
-        buffer.writeFloatLE(position.z, (i * 3 + 2) * FLOAT32_SIZE_BYTES);
-    }
-    return {
-        buffer: buffer,
-        propertyName: 'POSITION',
-        byteAlignment: FLOAT32_SIZE_BYTES
-    };
-}
-
 function deleteNull(tempObj) {
     for (let i = tempObj.children.length - 1; i >= 0; i--) {
         var child = tempObj.children[i];
@@ -1289,30 +741,6 @@ function deleteNull(tempObj) {
 }
 
 function computeOctantBoundingbox(minObj,maxobj) {
-    var boundingBox = {
-        box:[]
-    };
-    var center = {};
-    center["x"] = (minObj.x + maxobj.x) / 2;
-    center["y"] = (minObj.y + maxobj.y) / 2;
-    center["z"] = (minObj.z + maxobj.z) / 2;
-    // center.z = (minXYZ[1] + maxXYZ[1]) / 2;
-
-
-    var dimensions = {};
-    dimensions["x"] = maxobj.x - minObj.x;
-    dimensions["y"] = maxobj.y - minObj.y;
-    dimensions["z"] = maxobj.z - minObj.z;
-    var box = [
-        center["x"] , center["y"] , center["z"],
-        dimensions["x"] / 2, 0 , 0,
-        0 , dimensions["y"] / 2,0,
-        0 , 0 , dimensions["z"] / 2
-    ];
-    boundingBox.box = box;
-    return boundingBox;
-}
-function computeOctantBoundingbox22(minObj,maxobj) {
     var boundingBox = {
         box:[]
     };
@@ -1771,9 +1199,7 @@ function createStoreyMap(xmlJson) {
     }
     return storeyMap;
 }
-function findStoreyByGuid_storyMap(guid,storyMap) {
 
-}
 function findStoreyByGuid(guid,xmlJson) {
     // const guid = '2djUpNQFD2dRiVUyFA_bce';
     const result = JSONPath({path: '$..IfcBuildingStorey', json:xmlJson.ifc.decomposition.IfcProject});
