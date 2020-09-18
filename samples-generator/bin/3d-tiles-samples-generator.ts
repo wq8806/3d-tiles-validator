@@ -1,79 +1,18 @@
 #!/usr/bin/env node
 'use strict';
 
-import {
-    Cartesian3,
-    clone,
-    defaultValue,
-    defined,
-    Math as CesiumMath,
-    Matrix4,
-    Matrix3,
-    Transforms,
-    HeadingPitchRoll,
-    Quaternion, Ellipsoid
-} from 'cesium';
 import { Promise as Bluebird } from 'bluebird';
 import { createBatchTableHierarchy } from '../lib/createBatchTableHierarchy';
 import { GeneratorArgs } from '../lib/arguments';
 
 import {
     buildingsTransform,
-    buildingTemplate,
-    childrenRegion,
-    compositeGeometricError,
-    compositeRegion,
-    east,
     gzip,
-    instancesAnimatedUri,
-    instancesBoxLocal,
     instancesGeometricError,
-    instancesLength,
-    instancesModelSize,
-    instancesRedUri,
-    instancesRegion,
-    instancesTexturedUri,
-    instancesTileWidth,
-    instancesTransform,
-    instancesUri,
-    largeGeometricError,
-    latitude,
-    latitudeExtent,
-    llRegion,
-    llTileOptions,
-    longitude,
-    longitudeExtent,
-    lrRegion,
-    lrTileOptions,
-    north,
-    outputDirectory,
-    parentContentRegion,
-    parentRegion,
-    parentTileOptions,
-    pointCloudGeometricError,
-    pointCloudSphere,
-    pointCloudSphereLocal,
-    pointCloudTileWidth,
-    pointCloudTransform,
-    pointsLength,
     prettyJson,
-    smallBoxLocal,
-    smallGeometricError,
-    smallRegion,
-    smallSphere,
-    smallSphereLocal,
-    south,
-    tileWidth,
-    ulRegion,
-    ulTileOptions,
-    urRegion,
-    urTileOptions,
-    west
 } from '../lib/constants';
 import { createTilesetJsonSingle } from '../lib/createTilesetJsonSingle';
 import { metersToLongitude, toCamelCase, wgs84Transform } from '../lib/utility';
-import { TilesetSamplesNext } from '../lib/tilesetSamplesNext';
-import { SamplesNext } from '../lib/samplesNext';
 
 const fsExtra = require('fs-extra');
 var gltfPipeline = require('gltf-pipeline');
