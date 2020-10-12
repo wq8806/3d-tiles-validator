@@ -25,7 +25,12 @@ export class Material {
      * @returns {Material} The material.
      */
 
-    static fromGltf(material: any): Material {
+    static fromGltf(material: any, gltf: any): Material | TexturedMaterial {
+        if(material.pbrMetallicRoughness.baseColorTexture){
+            const texture = gltf.textures[material.pbrMetallicRoughness.baseColorTexture.index];
+            const imageUri = gltf.images[texture.source].uri;
+            return new TexturedMaterial(imageUri,material.alphaMode)
+        }
         return new Material(material.pbrMetallicRoughness.baseColorFactor,material.alphaMode);
     }
 }
@@ -36,8 +41,10 @@ export class TexturedMaterial {
     //       createGltf.js will inspect the type of `baseColor` to determine
     //       what to do with this object. Needs to be refactored later.
     baseColor: string;
+    alphaMode: string;
 
-    constructor(baseColor: string) {
+    constructor(baseColor: string,alphaMode: string='OPAQUE') {
         this.baseColor = baseColor;
+        this.alphaMode = alphaMode;
     }
 }

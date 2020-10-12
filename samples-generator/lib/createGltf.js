@@ -30,6 +30,7 @@ var sizeOfFloat32 = 4;
  * @param {Boolean} [options.use3dTilesNext=false] Modify the GLTF to name batch ids with a numerical suffix
  * @param {Boolean} [options.animated=false] Whether to include glTF animations.
  * @param {Boolean} [options.compressDracoMeshes] use compressDraco or not
+ * @param {string} [options.resourcePath] resourcePath.
  * @todo options.use3dTilesNext will be deprecated soon, all 3dtilesnext logic
  *       will go into a dedicated class.
  *
@@ -43,6 +44,7 @@ function createGltf(options) {
     var deprecated = defaultValue(options.deprecated, false);
     var compressDracoMeshes = defaultValue(options.compressDracoMeshes,false);
     var animated = defaultValue(options.animated, false);
+    const resourcePath = defaultValue(options.resourcePath,'');
 
     var mesh = options.mesh;
     var positions = mesh.positions;
@@ -298,7 +300,7 @@ function createGltf(options) {
 
         if (defined(baseColorTexture)) {
             material.pbrMetallicRoughness.baseColorTexture = {
-                index : 0
+                index : i//0
             };
         }
 
@@ -518,7 +520,7 @@ function createGltf(options) {
     } else {
         nodes = [
             {
-                matrix : rootMatrix,
+                // matrix : rootMatrix,
                 mesh : 0
             }
         ];
@@ -598,16 +600,17 @@ function createGltf(options) {
     compressDracoMeshesdefaults['quantize-generic-bits'] = 12;*/
 
     var gltfOptions = {
-        resourceDirectory : rootDirectory
+        resourceDirectory : rootDirectory + resourcePath,
+        separateTextures : true
     };
     if(compressDracoMeshes){
         gltfOptions.dracoOptions = compressDracoMeshesdefaults;
     }
-    /*return processGltf(gltf,gltfOptions).then(function (results) {
+    return processGltf(gltf,gltfOptions).then(function (results) {
         return results.gltf;
-    });*/
-    return gltfToGlb(gltf, gltfOptions)
+    });
+    /*return gltfToGlb(gltf, gltfOptions)
         .then(function(results) {
             return results.glb;
-        });
+        });*/
 }

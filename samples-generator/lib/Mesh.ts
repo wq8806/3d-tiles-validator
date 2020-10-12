@@ -411,6 +411,58 @@ export class Mesh {
         return new Mesh(indices, positions, normals, uvs, vertexColors);
     }
 
+    static decomposeGltf(gltf:Gltf): Mesh[]{
+        const result:Mesh[] = [];
+        const nodes = gltf.nodes;
+        const meshes = gltf.meshes;
+        const primitives = [];
+        let gltfHasUint32indeces = false;
+        let indexOffset = 0;
+        for (let i = 0; i < meshes.length; i++) {
+            const gltfPrimitiveArray = meshes[i].primitives;
+            for (let j = 0; j < gltfPrimitiveArray.length; j++) {
+                const primitive = gltfPrimitiveArray[j];
+                if(!primitive){
+                    debugger
+                }
+                const primitiveMaterial = gltf.materials[primitive.material];
+                const material = Material.fromGltf(primitiveMaterial,gltf);
+                const indicesAccessor = gltf.accessors[primitive.indices];
+                const indices = getAccessor(gltf, indicesAccessor);
+                if (indicesAccessor.componentType === ComponentDatatype.UNSIGNED_INT){
+                    gltfHasUint32indeces = true;
+                }
+                const positions = getAccessor(gltf, gltf.accessors[primitive.attributes.POSITION]);
+                const normals = getAccessor(gltf, gltf.accessors[primitive.attributes.NORMAL]);
+                const uvs = getAccessor(gltf,gltf.accessors[primitive.attributes.TEXCOORD_0]);
+                const vertexColors = new Array(positions.length / 3 * 4).fill(0);
+                const vertexCount = positions.length / 3;
+                const batchIds = new Array(vertexCount).fill(i);
+
+                const indicesLength = indices.length;
+                const meshView = new MeshView(
+                    material,
+                    0,//indexOffset,
+                    indicesLength
+                );
+
+                const mesh = new Mesh(
+                    indices,
+                    positions,
+                    normals,
+                    uvs,
+                    vertexColors,
+                    batchIds,
+                    undefined,
+                    [meshView],
+                    gltfHasUint32indeces
+                );
+                result.push(mesh);
+                // indexOffset += indicesLength;
+            }
+        }
+        return result;
+    }
     /**
      * Creates a mesh from a glTF. This utility is designed only for simple
      * glTFs like those in the data folder.
@@ -460,7 +512,7 @@ export class Mesh {
         for (var i = 0; i < primitivesLength; ++i) {
             var primitive = gltfPrimitiveArray[i];        //部分缺失
             var primitiveMaterial = gltf.materials[primitive.material];
-            var material = Material.fromGltf(primitiveMaterial);
+            var material = Material.fromGltf(primitiveMaterial,gltf);
             var indicesAccessor = gltf.accessors[primitive.indices];
             var indices = getAccessor(gltf, indicesAccessor);
             if (indicesAccessor.componentType === ComponentDatatype.UNSIGNED_INT){

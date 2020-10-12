@@ -89,6 +89,48 @@ export function createBatchTableHierarchy(options) {
     const outputPath = defaultValue(options.output,path.join(directoryPath,'output'))
     options.gltfDirectory = directoryPath;
     options.outputPath = outputPath;
+
+    const gltfUrl = "../data/bim/gltfdecompose/chuang01.gltf";
+    const resultBasePath = "D:/Code/CesiumTools/3d-tiles-validator/samples-generator/data/bim/gltfdecompose/output/";
+    return fsExtra.readJson(gltfUrl)
+        .then(function (gltf) {
+            const meshes = Mesh.decomposeGltf(gltf);
+            const promiseArray = [];
+            for (let i = 0; i < meshes.length; i++) {
+                const promise = createGltf({
+                    mesh : meshes[i],
+                    compressDracoMeshes : false,
+                    resourcePath: "data/bim/gltfdecompose/",
+                    useBatchIds : false
+                });
+                promiseArray.push(promise);
+            }
+            return Promise.all(promiseArray).then(function (results) {
+                for (let i = 0; i < results.length; i++) {
+                    const outputname = path.join(resultBasePath, i + ".gltf");
+                    saveJson(outputname, results[i], true);
+                }
+                console.log("done");
+            }).catch(error => {
+                console.error(error);
+            })
+            /*return createGltf({
+                mesh : meshes[3],
+                compressDracoMeshes : false,
+                resourcePath: "data/bim/gltfdecompose/",
+                useBatchIds : false
+            }).then((data) => {
+                debugger
+                // console.log(data);
+                const outputname = path.join(resultBasePath, "4.gltf");
+                return saveJson(outputname, data, true);
+            }).catch(error =>{
+                console.error(error);
+            });*/
+        }).catch(function (reason) {
+            console.error(reason);
+        });
+    return ;
     readXml({directoryPath:directoryPath}).then((value:any) =>  {
         // const xmlJson = value.xmlJson;
         xmlJson = value.xmlJson;
